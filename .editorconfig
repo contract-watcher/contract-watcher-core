@@ -186,3 +186,7 @@ dotnet_naming_symbols.readonly.required_modifiers = readonly
 #dotnet_naming_style.begins_with__.required_suffix =
 #dotnet_naming_style.begins_with__.word_separator =
 #dotnet_naming_style.begins_with__.capitalization = camel_case
+
+# EF Core migrations are generated code
+[src/Data/Migrations/**.cs]
+generated_code = true
