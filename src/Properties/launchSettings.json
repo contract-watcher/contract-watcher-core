@@ -1,0 +1,14 @@
+﻿{
+  "profiles": {
+    "ContractWatcher.Core": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": false,
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "DOTNET_CLI_TELEMETRY_OPTOUT": "true"
+      },
+      "commandLineArgs": "--migrate"
+    }
+  }
+}
