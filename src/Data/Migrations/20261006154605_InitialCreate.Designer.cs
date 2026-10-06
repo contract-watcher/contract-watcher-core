@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace ContractWatcher.Core.Data.Migrations
 {
     [DbContext(typeof(DataContext))]
-    [Migration("20261005160746_InitialCreate")]
+    [Migration("20261006154605_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -34,6 +34,9 @@ namespace ContractWatcher.Core.Data.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid>("IntegrationId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("KeyHash")
                         .IsRequired()
                         .HasMaxLength(64)
@@ -52,9 +55,6 @@ namespace ContractWatcher.Core.Data.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
-                    b.Property<Guid>("ProjectId")
-                        .HasColumnType("uuid");
-
                     b.Property<DateTime?>("RevokedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -63,10 +63,10 @@ namespace ContractWatcher.Core.Data.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("IntegrationId");
+
                     b.HasIndex("KeyHash")
                         .IsUnique();
-
-                    b.HasIndex("ProjectId");
 
                     b.ToTable("ApiKeys");
                 });
@@ -84,13 +84,13 @@ namespace ContractWatcher.Core.Data.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
 
+                    b.Property<Guid>("IntegrationId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
-
-                    b.Property<Guid>("ProjectId")
-                        .HasColumnType("uuid");
 
                     b.Property<string>("Slug")
                         .IsRequired()
@@ -102,7 +102,7 @@ namespace ContractWatcher.Core.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ProjectId", "Slug")
+                    b.HasIndex("IntegrationId", "Slug")
                         .IsUnique();
 
                     b.ToTable("Contracts");
@@ -142,6 +142,43 @@ namespace ContractWatcher.Core.Data.Migrations
                     b.ToTable("ContractVersions");
                 });
 
+            modelBuilder.Entity("ContractWatcher.Core.Data.Domain.Integration", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Slug")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProjectId", "Slug")
+                        .IsUnique();
+
+                    b.ToTable("Integrations");
+                });
+
             modelBuilder.Entity("ContractWatcher.Core.Data.Domain.Project", b =>
                 {
                     b.Property<Guid>("Id")
@@ -171,24 +208,24 @@ namespace ContractWatcher.Core.Data.Migrations
 
             modelBuilder.Entity("ContractWatcher.Core.Data.Domain.ApiKey", b =>
                 {
-                    b.HasOne("ContractWatcher.Core.Data.Domain.Project", "Project")
+                    b.HasOne("ContractWatcher.Core.Data.Domain.Integration", "Integration")
                         .WithMany("ApiKeys")
-                        .HasForeignKey("ProjectId")
+                        .HasForeignKey("IntegrationId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation("Project");
+                    b.Navigation("Integration");
                 });
 
             modelBuilder.Entity("ContractWatcher.Core.Data.Domain.Contract", b =>
                 {
-                    b.HasOne("ContractWatcher.Core.Data.Domain.Project", "Project")
+                    b.HasOne("ContractWatcher.Core.Data.Domain.Integration", "Integration")
                         .WithMany("Contracts")
-                        .HasForeignKey("ProjectId")
+                        .HasForeignKey("IntegrationId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation("Project");
+                    b.Navigation("Integration");
                 });
 
             modelBuilder.Entity("ContractWatcher.Core.Data.Domain.ContractVersion", b =>
@@ -202,16 +239,32 @@ namespace ContractWatcher.Core.Data.Migrations
                     b.Navigation("Contract");
                 });
 
+            modelBuilder.Entity("ContractWatcher.Core.Data.Domain.Integration", b =>
+                {
+                    b.HasOne("ContractWatcher.Core.Data.Domain.Project", "Project")
+                        .WithMany("Integrations")
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Project");
+                });
+
             modelBuilder.Entity("ContractWatcher.Core.Data.Domain.Contract", b =>
                 {
                     b.Navigation("Versions");
                 });
 
-            modelBuilder.Entity("ContractWatcher.Core.Data.Domain.Project", b =>
+            modelBuilder.Entity("ContractWatcher.Core.Data.Domain.Integration", b =>
                 {
                     b.Navigation("ApiKeys");
 
                     b.Navigation("Contracts");
+                });
+
+            modelBuilder.Entity("ContractWatcher.Core.Data.Domain.Project", b =>
+                {
+                    b.Navigation("Integrations");
                 });
 #pragma warning restore 612, 618
         }

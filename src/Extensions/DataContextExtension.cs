@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 
 namespace ContractWatcher.Core.Extensions;
 
@@ -13,16 +14,18 @@ public static class DataContextExtension
     )
         where TContext : DbContext
     {
-        services.AddPooledDbContextFactory<TContext>(builder =>
+        services.AddPooledDbContextFactory<TContext>((provider, builder) =>
             builder
                 .EnableSensitiveDataLogging(enableSensitiveDataLogging)
                 .UseNpgsql(connectionString)
+                .AddInterceptors(provider.GetServices<IInterceptor>())
         );
 
-        services.AddDbContextPool<DbContext, TContext>(builder =>
+        services.AddDbContextPool<DbContext, TContext>((provider, builder) =>
             builder
                 .EnableSensitiveDataLogging(enableSensitiveDataLogging)
                 .UseNpgsql(connectionString)
+                .AddInterceptors(provider.GetServices<IInterceptor>())
         );
 
         return services;

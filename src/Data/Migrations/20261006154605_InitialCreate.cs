@@ -27,32 +27,7 @@ namespace ContractWatcher.Core.Data.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "ApiKeys",
-                columns: table => new
-                {
-                    Id = table.Column<Guid>(type: "uuid", nullable: false),
-                    ProjectId = table.Column<Guid>(type: "uuid", nullable: false),
-                    Name = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
-                    KeyHash = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
-                    KeyHint = table.Column<string>(type: "character varying(8)", maxLength: 8, nullable: false),
-                    LastUsedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
-                    RevokedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
-                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_ApiKeys", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_ApiKeys_Projects_ProjectId",
-                        column: x => x.ProjectId,
-                        principalTable: "Projects",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "Contracts",
+                name: "Integrations",
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
@@ -65,11 +40,59 @@ namespace ContractWatcher.Core.Data.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_Contracts", x => x.Id);
+                    table.PrimaryKey("PK_Integrations", x => x.Id);
                     table.ForeignKey(
-                        name: "FK_Contracts_Projects_ProjectId",
+                        name: "FK_Integrations_Projects_ProjectId",
                         column: x => x.ProjectId,
                         principalTable: "Projects",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "ApiKeys",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    IntegrationId = table.Column<Guid>(type: "uuid", nullable: false),
+                    Name = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    KeyHash = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
+                    KeyHint = table.Column<string>(type: "character varying(8)", maxLength: 8, nullable: false),
+                    LastUsedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    RevokedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_ApiKeys", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_ApiKeys_Integrations_IntegrationId",
+                        column: x => x.IntegrationId,
+                        principalTable: "Integrations",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Contracts",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    IntegrationId = table.Column<Guid>(type: "uuid", nullable: false),
+                    Slug = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    Name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                    Description = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: true),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Contracts", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_Contracts_Integrations_IntegrationId",
+                        column: x => x.IntegrationId,
+                        principalTable: "Integrations",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                 });
@@ -98,26 +121,32 @@ namespace ContractWatcher.Core.Data.Migrations
                 });
 
             migrationBuilder.CreateIndex(
+                name: "IX_ApiKeys_IntegrationId",
+                table: "ApiKeys",
+                column: "IntegrationId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_ApiKeys_KeyHash",
                 table: "ApiKeys",
                 column: "KeyHash",
                 unique: true);
 
             migrationBuilder.CreateIndex(
-                name: "IX_ApiKeys_ProjectId",
-                table: "ApiKeys",
-                column: "ProjectId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_Contracts_ProjectId_Slug",
+                name: "IX_Contracts_IntegrationId_Slug",
                 table: "Contracts",
-                columns: new[] { "ProjectId", "Slug" },
+                columns: new[] { "IntegrationId", "Slug" },
                 unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "IX_ContractVersions_ContractId_Version",
                 table: "ContractVersions",
                 columns: new[] { "ContractId", "Version" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Integrations_ProjectId_Slug",
+                table: "Integrations",
+                columns: new[] { "ProjectId", "Slug" },
                 unique: true);
 
             migrationBuilder.CreateIndex(
@@ -137,6 +166,9 @@ namespace ContractWatcher.Core.Data.Migrations
 
             migrationBuilder.DropTable(
                 name: "Contracts");
+
+            migrationBuilder.DropTable(
+                name: "Integrations");
 
             migrationBuilder.DropTable(
                 name: "Projects");
