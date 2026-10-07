@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace ContractWatcher.Core.Data.Migrations
 {
     [DbContext(typeof(DataContext))]
-    [Migration("20261007124611_AddUsers")]
+    [Migration("20261007130959_AddUsers")]
     partial class AddUsers
     {
         /// <inheritdoc />
@@ -206,6 +206,42 @@ namespace ContractWatcher.Core.Data.Migrations
                     b.ToTable("Projects");
                 });
 
+            modelBuilder.Entity("ContractWatcher.Core.Data.Domain.RefreshToken", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("RevokedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique();
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("RefreshTokens");
+                });
+
             modelBuilder.Entity("ContractWatcher.Core.Data.Domain.User", b =>
                 {
                     b.Property<Guid>("Id")
@@ -216,30 +252,26 @@ namespace ContractWatcher.Core.Data.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Email")
+                        .IsRequired()
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
-
-                    b.Property<string>("ExternalId")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
-                    b.Property<string>("Provider")
+                    b.Property<string>("PasswordHash")
                         .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Provider", "ExternalId")
+                    b.HasIndex("Email")
                         .IsUnique();
 
                     b.ToTable("Users");
@@ -300,6 +332,17 @@ namespace ContractWatcher.Core.Data.Migrations
                     b.Navigation("Owner");
                 });
 
+            modelBuilder.Entity("ContractWatcher.Core.Data.Domain.RefreshToken", b =>
+                {
+                    b.HasOne("ContractWatcher.Core.Data.Domain.User", "User")
+                        .WithMany("RefreshTokens")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("ContractWatcher.Core.Data.Domain.Contract", b =>
                 {
                     b.Navigation("Versions");
@@ -320,6 +363,8 @@ namespace ContractWatcher.Core.Data.Migrations
             modelBuilder.Entity("ContractWatcher.Core.Data.Domain.User", b =>
                 {
                     b.Navigation("Projects");
+
+                    b.Navigation("RefreshTokens");
                 });
 #pragma warning restore 612, 618
         }

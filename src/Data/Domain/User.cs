@@ -1,19 +1,19 @@
 namespace ContractWatcher.Core.Data.Domain;
 
 /// <summary>
-/// Пользователь. Аутентифицируется через внешнего провайдера, пароль не хранится
+/// Пользователь. Входит по email и паролю
 /// </summary>
 public class User : BaseEntity
 {
     /// <summary>
-    /// Провайдер аутентификации, например «github»
+    /// Email — логин пользователя. Хранится нормализованным: без пробелов по краям, в нижнем регистре
     /// </summary>
-    public required string Provider { get; set; }
+    public required string Email { get; set; }
 
     /// <summary>
-    /// ID пользователя у провайдера
+    /// Хеш пароля. Сам пароль не хранится
     /// </summary>
-    public required string ExternalId { get; set; }
+    public required string PasswordHash { get; set; }
 
     /// <summary>
     /// Отображаемое имя
@@ -21,12 +21,12 @@ public class User : BaseEntity
     public required string Name { get; set; }
 
     /// <summary>
-    /// Email. Провайдер может его не отдать, например если пользователь скрыл email в GitHub
-    /// </summary>
-    public string? Email { get; set; }
-
-    /// <summary>
     /// Проекты пользователя
     /// </summary>
     public List<Project> Projects { get; set; } = [];
+
+    /// <summary>
+    /// Refresh-токены пользователя
+    /// </summary>
+    public List<RefreshToken> RefreshTokens { get; set; } = [];
 }
