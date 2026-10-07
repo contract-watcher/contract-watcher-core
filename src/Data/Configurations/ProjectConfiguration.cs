@@ -10,6 +10,10 @@ public class ProjectConfiguration : IEntityTypeConfiguration<Project>
     {
         builder.Property(x => x.Name).HasMaxLength(200);
 
-        builder.HasIndex(x => x.OwnerId);
+        builder
+            .HasOne(x => x.Owner)
+            .WithMany(x => x.Projects)
+            .HasForeignKey(x => x.OwnerId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }
