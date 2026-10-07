@@ -6,17 +6,17 @@ namespace ContractWatcher.Core.Data.Domain;
 public class Contract : BaseEntity
 {
     /// <summary>
-    /// ID проекта
+    /// ID интеграции
     /// </summary>
-    public Guid ProjectId { get; set; }
+    public Guid IntegrationId { get; set; }
 
     /// <summary>
-    /// Проект
+    /// Интеграция
     /// </summary>
-    public Project Project { get; set; } = null!;
+    public Integration Integration { get; set; } = null!;
 
     /// <summary>
-    /// Идентификатор контракта, по которому его находит библиотека, например «yookassa-payments»
+    /// Идентификатор контракта, уникальный в пределах интеграции, по которому его находит библиотека, например «payments»
     /// </summary>
     public required string Slug { get; set; }
 

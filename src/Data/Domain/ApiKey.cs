@@ -6,14 +6,14 @@ namespace ContractWatcher.Core.Data.Domain;
 public class ApiKey : BaseEntity
 {
     /// <summary>
-    /// ID проекта
+    /// ID интеграции
     /// </summary>
-    public Guid ProjectId { get; set; }
+    public Guid IntegrationId { get; set; }
 
     /// <summary>
-    /// Проект
+    /// Интеграция
     /// </summary>
-    public Project Project { get; set; } = null!;
+    public Integration Integration { get; set; } = null!;
 
     /// <summary>
     /// Название ключа, например «prod» или «staging»

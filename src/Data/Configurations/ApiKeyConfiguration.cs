@@ -15,9 +15,9 @@ public class ApiKeyConfiguration : IEntityTypeConfiguration<ApiKey>
         builder.HasIndex(x => x.KeyHash).IsUnique();
 
         builder
-            .HasOne(x => x.Project)
+            .HasOne(x => x.Integration)
             .WithMany(x => x.ApiKeys)
-            .HasForeignKey(x => x.ProjectId)
+            .HasForeignKey(x => x.IntegrationId)
             .OnDelete(DeleteBehavior.Cascade);
     }
 }

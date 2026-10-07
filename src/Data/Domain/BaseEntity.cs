@@ -6,17 +6,17 @@ namespace ContractWatcher.Core.Data.Domain;
 public abstract class BaseEntity
 {
     /// <summary>
-    /// ID сущности
+    /// ID сущности. Генерируется при добавлении в контекст (UUIDv7)
     /// </summary>
-    public Guid Id { get; set; } = Guid.CreateVersion7();
+    public Guid Id { get; set; }
 
     /// <summary>
-    /// Дата создания сущности
+    /// Дата создания сущности. Проставляется при сохранении
     /// </summary>
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime CreatedAt { get; set; }
 
     /// <summary>
-    /// Дата обновления сущности
+    /// Дата обновления сущности. Проставляется при сохранении
     /// </summary>
-    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime UpdatedAt { get; set; }
 }

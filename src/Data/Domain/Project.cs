@@ -11,17 +11,17 @@ public class Project : BaseEntity
     public Guid OwnerId { get; set; }
 
     /// <summary>
+    /// Владелец проекта
+    /// </summary>
+    public User Owner { get; set; } = null!;
+
+    /// <summary>
     /// Название проекта
     /// </summary>
     public required string Name { get; set; }
 
     /// <summary>
-    /// API-ключи проекта
+    /// Интеграции проекта
     /// </summary>
-    public List<ApiKey> ApiKeys { get; set; } = [];
-
-    /// <summary>
-    /// Контракты проекта
-    /// </summary>
-    public List<Contract> Contracts { get; set; } = [];
+    public List<Integration> Integrations { get; set; } = [];
 }
