@@ -20,9 +20,13 @@ builder.Services.AddDataContext<DataContext>(
     builder.Configuration.GetValue<int>("DbConnections:Postgres:MaxDelaySec")
 );
 
+builder.Services.AddAuth(builder.Configuration);
+
 builder.Services.AddControllers();
 
 var app = builder.Build();
+
+app.UseRateLimiter();
 
 app.MapControllers();
 

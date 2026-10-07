@@ -5,6 +5,9 @@ namespace ContractWatcher.Core.Data.Domain;
 /// </summary>
 public class User : BaseEntity
 {
+    public const int EmailMaxLength = 256;
+    public const int NameMaxLength = 200;
+
     /// <summary>
     /// Email — логин пользователя. Хранится нормализованным: без пробелов по краям, в нижнем регистре
     /// </summary>
