@@ -149,7 +149,7 @@ public class AuthService(
                 ExpiresAt = refreshTokenExpiresAt,
             }
         );
-
+        
         return new AuthTokens(accessToken, accessTokenExpiresAt, refreshToken, refreshTokenExpiresAt);
     }
 

@@ -8,9 +8,9 @@ public class IntegrationConfiguration : IEntityTypeConfiguration<Integration>
 {
     public void Configure(EntityTypeBuilder<Integration> builder)
     {
-        builder.Property(x => x.Slug).HasMaxLength(100);
-        builder.Property(x => x.Name).HasMaxLength(200);
-        builder.Property(x => x.Description).HasMaxLength(1000);
+        builder.Property(x => x.Slug).HasMaxLength(Integration.SlugMaxLength);
+        builder.Property(x => x.Name).HasMaxLength(Integration.NameMaxLength);
+        builder.Property(x => x.Description).HasMaxLength(Integration.DescriptionMaxLength);
 
         builder.HasIndex(x => new { x.ProjectId, x.Slug }).IsUnique();
 

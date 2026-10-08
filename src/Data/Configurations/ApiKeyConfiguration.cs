@@ -8,7 +8,7 @@ public class ApiKeyConfiguration : IEntityTypeConfiguration<ApiKey>
 {
     public void Configure(EntityTypeBuilder<ApiKey> builder)
     {
-        builder.Property(x => x.Name).HasMaxLength(100);
+        builder.Property(x => x.Name).HasMaxLength(ApiKey.NameMaxLength);
         builder.Property(x => x.KeyHash).HasMaxLength(64);
         builder.Property(x => x.KeyHint).HasMaxLength(8);
 

@@ -5,6 +5,8 @@ namespace ContractWatcher.Core.Data.Domain;
 /// </summary>
 public class Project : BaseEntity
 {
+    public const int NameMaxLength = 200;
+
     /// <summary>
     /// ID владельца проекта
     /// </summary>

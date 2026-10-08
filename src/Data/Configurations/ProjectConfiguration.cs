@@ -8,7 +8,7 @@ public class ProjectConfiguration : IEntityTypeConfiguration<Project>
 {
     public void Configure(EntityTypeBuilder<Project> builder)
     {
-        builder.Property(x => x.Name).HasMaxLength(200);
+        builder.Property(x => x.Name).HasMaxLength(Project.NameMaxLength);
 
         builder
             .HasOne(x => x.Owner)

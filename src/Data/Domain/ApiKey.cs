@@ -5,6 +5,8 @@ namespace ContractWatcher.Core.Data.Domain;
 /// </summary>
 public class ApiKey : BaseEntity
 {
+    public const int NameMaxLength = 100;
+
     /// <summary>
     /// ID интеграции
     /// </summary>

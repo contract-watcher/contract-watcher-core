@@ -2,7 +2,6 @@ using ContractWatcher.Core.Extensions;
 using ContractWatcher.Core.Models.Auth;
 using ContractWatcher.Core.Services.Auth;
 using FluentValidation;
-using FluentValidation.Results;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 
@@ -11,7 +10,7 @@ namespace ContractWatcher.Core.Controllers;
 [ApiController]
 [Route("api/auth")]
 [EnableRateLimiting(AuthExtension.RateLimitPolicy)]
-public class AuthController(AuthService authService) : ControllerBase
+public class AuthController(AuthService authService) : ApiControllerBase
 {
     /// <summary>
     /// Регистрация. Сразу выдаёт токены, отдельный вход не нужен
@@ -98,7 +97,4 @@ public class AuthController(AuthService authService) : ControllerBase
         await authService.LogoutAsync(request.RefreshToken, cancellationToken);
         return NoContent();
     }
-
-    private ActionResult ValidationFailed(ValidationResult validation) =>
-        ValidationProblem(new ValidationProblemDetails(validation.ToDictionary()));
 }
