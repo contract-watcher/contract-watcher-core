@@ -2,6 +2,9 @@ using System.Reflection;
 using ContractWatcher.Core.Data;
 using ContractWatcher.Core.Data.Interceptors;
 using ContractWatcher.Core.Extensions;
+using ContractWatcher.Core.Services.ApiKeys;
+using ContractWatcher.Core.Services.Integrations;
+using ContractWatcher.Core.Services.Projects;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -22,11 +25,18 @@ builder.Services.AddDataContext<DataContext>(
 
 builder.Services.AddAuth(builder.Configuration);
 
+builder.Services
+    .AddScoped<ProjectService>()
+    .AddScoped<IntegrationService>()
+    .AddScoped<ApiKeyService>();
+
 builder.Services.AddControllers();
 
 var app = builder.Build();
 
 app.UseRateLimiter();
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.MapControllers();
 

@@ -5,6 +5,10 @@ namespace ContractWatcher.Core.Data.Domain;
 /// </summary>
 public class Integration : BaseEntity
 {
+    public const int SlugMaxLength = 100;
+    public const int NameMaxLength = 200;
+    public const int DescriptionMaxLength = 1000;
+
     /// <summary>
     /// ID проекта
     /// </summary>

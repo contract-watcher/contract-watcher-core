@@ -1,4 +1,6 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text;
+using Microsoft.IdentityModel.Tokens;
 
 namespace ContractWatcher.Core.Services.Auth;
 
@@ -39,4 +41,9 @@ public class JwtOptions
     /// </summary>
     [Range(1, 365)]
     public int RefreshTokenLifetimeDays { get; set; }
+
+    /// <summary>
+    /// Ключ подписи: им подписываются выдаваемые токены и проверяются входящие
+    /// </summary>
+    public SymmetricSecurityKey GetSigningKey() => new(Encoding.UTF8.GetBytes(SigningKey));
 }

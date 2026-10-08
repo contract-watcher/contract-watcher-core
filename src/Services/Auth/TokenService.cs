@@ -39,10 +39,7 @@ public class TokenService(IOptions<JwtOptions> options, TimeProvider timeProvide
                 [JwtRegisteredClaimNames.Email] = user.Email,
                 [JwtRegisteredClaimNames.Jti] = Guid.NewGuid().ToString(),
             },
-            SigningCredentials = new SigningCredentials(
-                new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt.SigningKey)),
-                SecurityAlgorithms.HmacSha256
-            ),
+            SigningCredentials = new SigningCredentials(jwt.GetSigningKey(), SecurityAlgorithms.HmacSha256),
         };
 
         return (TokenHandler.CreateToken(descriptor), expiresAt);
@@ -55,7 +52,7 @@ public class TokenService(IOptions<JwtOptions> options, TimeProvider timeProvide
         Base64Url.EncodeToString(RandomNumberGenerator.GetBytes(RefreshTokenSizeBytes));
 
     /// <summary>
-    /// SHA-256 хеш токена в hex, под колонку RefreshToken.TokenHash
+    /// SHA-256 хеш секрета в hex. Так хранятся refresh-токены (RefreshToken.TokenHash) и API-ключи (ApiKey.KeyHash)
     /// </summary>
     public static string HashToken(string token) =>
         Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
