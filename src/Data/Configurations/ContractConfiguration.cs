@@ -8,9 +8,9 @@ public class ContractConfiguration : IEntityTypeConfiguration<Contract>
 {
     public void Configure(EntityTypeBuilder<Contract> builder)
     {
-        builder.Property(x => x.Slug).HasMaxLength(100);
-        builder.Property(x => x.Name).HasMaxLength(200);
-        builder.Property(x => x.Description).HasMaxLength(1000);
+        builder.Property(x => x.Slug).HasMaxLength(Contract.SlugMaxLength);
+        builder.Property(x => x.Name).HasMaxLength(Contract.NameMaxLength);
+        builder.Property(x => x.Description).HasMaxLength(Contract.DescriptionMaxLength);
 
         builder.HasIndex(x => new { x.IntegrationId, x.Slug }).IsUnique();
 
