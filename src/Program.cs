@@ -30,7 +30,8 @@ builder.Services
     .AddScoped<ProjectService>()
     .AddScoped<IntegrationService>()
     .AddScoped<ApiKeyService>()
-    .AddScoped<ContractService>();
+    .AddScoped<ContractService>()
+    .AddScoped<ContractVersionService>();
 
 builder.Services.AddControllers();
 
