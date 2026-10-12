@@ -74,4 +74,21 @@ public class ContractVersionController(ContractVersionService contractVersionSer
 
         return CreatedAtAction(nameof(Get), new { contractId, version = version!.Version }, version);
     }
+
+    /// <summary>
+    /// Публикация версии: после неё SDK получает эту версию. Повторная публикация не меняет дату
+    /// </summary>
+    [HttpPost("{version:int}/publish")]
+    public async Task<ActionResult<ContractVersionResponse>> Publish(
+        Guid contractId,
+        int version,
+        CancellationToken cancellationToken
+    )
+    {
+        var published = await contractVersionService.PublishAsync(CurrentUserId, contractId, version, cancellationToken);
+        if (published is null)
+            return NotFound();
+
+        return published;
+    }
 }

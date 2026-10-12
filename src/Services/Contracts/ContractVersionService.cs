@@ -19,7 +19,7 @@ public enum ContractVersionCreateStatus
 /// <summary>
 /// Версии контракта. Доступны только владельцу проекта, к которому относится контракт
 /// </summary>
-public class ContractVersionService(DataContext db)
+public class ContractVersionService(DataContext db, TimeProvider timeProvider)
 {
     /// <summary>
     /// Версии контракта по возрастанию номера. Null — контракта нет или проект чужой
@@ -91,7 +91,43 @@ public class ContractVersionService(DataContext db)
             return (ContractVersionCreateStatus.VersionConflict, null);
         }
 
-        var response = new ContractVersionResponse(
+        return (ContractVersionCreateStatus.Created, ToResponse(version));
+    }
+
+    /// <summary>
+    /// Публикует версию — после этого её получает SDK. Повторная публикация не меняет дату. Null — версии нет или проект чужой
+    /// </summary>
+    public async Task<ContractVersionResponse?> PublishAsync(
+        Guid userId,
+        Guid contractId,
+        int version,
+        CancellationToken cancellationToken
+    )
+    {
+        var contractVersion = await db.ContractVersions.SingleOrDefaultAsync(
+            x =>
+                x.ContractId == contractId
+                && x.Version == version
+                && x.Contract.Integration.Project.OwnerId == userId,
+            cancellationToken
+        );
+        if (contractVersion is null)
+            return null;
+
+        if (contractVersion.PublishedAt is null)
+        {
+            contractVersion.PublishedAt = timeProvider.GetUtcNow().UtcDateTime;
+            await db.SaveChangesAsync(cancellationToken);
+        }
+
+        return ToResponse(contractVersion);
+    }
+
+    private Task<bool> ContractExistsAsync(Guid userId, Guid contractId, CancellationToken cancellationToken) =>
+        db.Contracts.AnyAsync(x => x.Id == contractId && x.Integration.Project.OwnerId == userId, cancellationToken);
+
+    private static ContractVersionResponse ToResponse(ContractVersion version) =>
+        new(
             version.Id,
             version.ContractId,
             version.Version,
@@ -100,12 +136,6 @@ public class ContractVersionService(DataContext db)
             version.CreatedAt,
             version.PublishedAt
         );
-
-        return (ContractVersionCreateStatus.Created, response);
-    }
-
-    private Task<bool> ContractExistsAsync(Guid userId, Guid contractId, CancellationToken cancellationToken) =>
-        db.Contracts.AnyAsync(x => x.Id == contractId && x.Integration.Project.OwnerId == userId, cancellationToken);
 
     private static IQueryable<ContractVersionResponse> ToResponse(IQueryable<ContractVersion> versions) =>
         versions.Select(x => new ContractVersionResponse(
