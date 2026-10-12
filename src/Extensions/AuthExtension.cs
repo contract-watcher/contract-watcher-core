@@ -34,7 +34,7 @@ public static class AuthExtension
                 (bearer, jwtOptions) =>
                 {
                     var jwt = jwtOptions.Value;
-
+                
                     // Оставляем claim «sub» как есть, без переименования в ClaimTypes.NameIdentifier
                     bearer.MapInboundClaims = false;
                     bearer.TokenValidationParameters = new TokenValidationParameters

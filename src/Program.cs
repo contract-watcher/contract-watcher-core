@@ -3,6 +3,7 @@ using ContractWatcher.Core.Data;
 using ContractWatcher.Core.Data.Interceptors;
 using ContractWatcher.Core.Extensions;
 using ContractWatcher.Core.Services.ApiKeys;
+using ContractWatcher.Core.Services.Contracts;
 using ContractWatcher.Core.Services.Integrations;
 using ContractWatcher.Core.Services.Projects;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -28,7 +29,9 @@ builder.Services.AddAuth(builder.Configuration);
 builder.Services
     .AddScoped<ProjectService>()
     .AddScoped<IntegrationService>()
-    .AddScoped<ApiKeyService>();
+    .AddScoped<ApiKeyService>()
+    .AddScoped<ContractService>()
+    .AddScoped<ContractVersionService>();
 
 builder.Services.AddControllers();
 

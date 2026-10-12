@@ -121,7 +121,10 @@ namespace ContractWatcher.Core.Data.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("Schema")
+                    b.Property<DateTime?>("PublishedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Rules")
                         .IsRequired()
                         .HasColumnType("jsonb");
 
