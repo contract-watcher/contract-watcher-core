@@ -1,3 +1,5 @@
+using ContractWatcher.Common.Contracts;
+
 namespace ContractWatcher.Core.Data.Domain;
 
 /// <summary>
@@ -5,6 +7,8 @@ namespace ContractWatcher.Core.Data.Domain;
 /// </summary>
 public class ContractVersion : BaseEntity
 {
+    public const int CommentMaxLength = 500;
+
     /// <summary>
     /// ID контракта
     /// </summary>
@@ -21,12 +25,17 @@ public class ContractVersion : BaseEntity
     public int Version { get; set; }
 
     /// <summary>
-    /// JSON Schema, по которой проверяются данные
+    /// Правила для полей ответа в формате ContractWatcher.Common
     /// </summary>
-    public required string Schema { get; set; }
+    public List<ContractRule> Rules { get; set; } = [];
 
     /// <summary>
     /// Комментарий к изменению
     /// </summary>
     public string? Comment { get; set; }
+
+    /// <summary>
+    /// Дата публикации. Null — версия не опубликована
+    /// </summary>
+    public DateTime? PublishedAt { get; set; }
 }
