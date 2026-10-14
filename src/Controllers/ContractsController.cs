@@ -65,7 +65,7 @@ public class ContractsController(ContractService contractService) : ApiControlle
             request,
             cancellationToken
         );
-
+        
         if (status == ContractCreateStatus.IntegrationNotFound)
             return NotFound();
 
