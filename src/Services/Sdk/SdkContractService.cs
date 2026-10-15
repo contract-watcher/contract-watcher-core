@@ -22,12 +22,12 @@ public class SdkContractService(DataContext db)
             .ContractVersions.AsNoTracking()
             .Where(x => x.Contract.IntegrationId == integrationId && x.Contract.Slug == slug && x.PublishedAt != null)
             .OrderByDescending(x => x.Version)
-            .Select(x => new { x.Version, x.Rules })
+            .Select(x => new {x.Contract.Slug ,x.Version, x.Rules  })
             .FirstOrDefaultAsync(cancellationToken);
 
         if (version is null)
             return null;
 
-        return new PublishedContract { ContractVersion = version.Version, Rules = version.Rules };
+        return new PublishedContract { Slug = version.Slug ,ContractVersion = version.Version, Rules = version.Rules ,  };
     }
 }
