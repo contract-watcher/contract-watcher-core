@@ -33,7 +33,8 @@ builder.Services
     .AddScoped<ApiKeyService>()
     .AddScoped<ContractService>()
     .AddScoped<ContractVersionService>()
-    .AddScoped<SdkContractService>();
+    .AddScoped<SdkContractService>()
+    .AddScoped<SdkReportService>();
 
 builder.Services.AddControllers();
 
