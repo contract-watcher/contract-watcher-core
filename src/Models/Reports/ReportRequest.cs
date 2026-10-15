@@ -7,7 +7,7 @@ using FluentValidation;
 namespace ContractWatcher.Core.Models.Reports;
 
 /// <summary>
-/// Отчёт проверки от SDK: поля ValidationReport из ContractWatcher.Common и slug проверенного контракта
+/// Отчёт проверки от SDK. По JSON совпадает с ValidationReport из ContractWatcher.Common
 /// </summary>
 /// <param name="Slug">Slug контракта в интеграции ключа</param>
 /// <param name="Status">Nullable, чтобы отсутствующий в запросе статус не превратился в Passed</param>
