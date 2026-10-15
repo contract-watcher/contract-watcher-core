@@ -16,7 +16,8 @@ namespace ContractWatcher.Core.Controllers;
 public class SdkReportsController(SdkReportService sdkReportService) : ControllerBase
 {
     /// <summary>
-    /// Приём отчёта. Контракт ищется по slug только в интеграции ключа. Нет контракта — 404
+    /// Приём отчёта. Контракт ищется по slug только в интеграции ключа. Нет контракта — 404.
+    /// Версия не опубликована или нарушения не сходятся с её правилами — 422 с расхождениями по полям
     /// </summary>
     [HttpPost]
     public async Task<ActionResult> Create(
@@ -29,9 +30,23 @@ public class SdkReportsController(SdkReportService sdkReportService) : Controlle
         if (!validation.IsValid)
             return ValidationProblem(new ValidationProblemDetails(validation.ToDictionary()));
 
-        var status = await sdkReportService.AcceptAsync(User.GetIntegrationId(), request, cancellationToken);
+        var (status, errors) = await sdkReportService.AcceptAsync(
+            User.GetIntegrationId(),
+            request,
+            cancellationToken
+        );
+
         if (status == SdkReportAcceptStatus.ContractNotFound)
             return NotFound();
+
+        if (status == SdkReportAcceptStatus.ContractMismatch)
+            return UnprocessableEntity(
+                new ValidationProblemDetails(errors!)
+                {
+                    Title = "Report does not match the published contract version",
+                    Status = StatusCodes.Status422UnprocessableEntity,
+                }
+            );
 
         return Accepted();
     }
