@@ -6,6 +6,7 @@ using ContractWatcher.Core.Services.ApiKeys;
 using ContractWatcher.Core.Services.Contracts;
 using ContractWatcher.Core.Services.Integrations;
 using ContractWatcher.Core.Services.Projects;
+using ContractWatcher.Core.Services.Reports;
 using ContractWatcher.Core.Services.Sdk;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 
@@ -35,7 +36,8 @@ builder.Services
     .AddScoped<ContractService>()
     .AddScoped<ContractVersionService>()
     .AddScoped<SdkContractService>()
-    .AddScoped<SdkReportService>();
+    .AddScoped<SdkReportService>()
+    .AddScoped<ReportService>();
 
 builder.Services.AddControllers();
 
