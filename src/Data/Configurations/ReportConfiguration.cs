@@ -32,8 +32,16 @@ public class ReportConfiguration : IEntityTypeConfiguration<Report>
                 )
             );
 
+        builder.Property(x => x.DeliveryError).HasMaxLength(Report.DeliveryErrorMaxLength);
+
         // Ключ идемпотентности: повторная вставка того же отчёта падает на этом индексе
         builder.HasIndex(x => x.ReportId).IsUnique();
+
+        // Очередь доставки в Monitoring: в индекс попадают только отчёты, которые ещё нужно отправить
+        builder
+            .HasIndex(x => x.CreatedAt)
+            .HasDatabaseName("IX_Reports_PendingDelivery")
+            .HasFilter("\"DeliveredAt\" IS NULL AND \"DeliveryError\" IS NULL");
 
         builder
             .HasOne(x => x.Contract)

@@ -257,6 +257,13 @@ namespace ContractWatcher.Core.Data.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<DateTime?>("DeliveredAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DeliveryError")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
                     b.Property<Guid>("ReportId")
                         .HasColumnType("uuid");
 
@@ -275,6 +282,10 @@ namespace ContractWatcher.Core.Data.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("ContractId");
+
+                    b.HasIndex("CreatedAt")
+                        .HasDatabaseName("IX_Reports_PendingDelivery")
+                        .HasFilter("\"DeliveredAt\" IS NULL AND \"DeliveryError\" IS NULL");
 
                     b.HasIndex("ReportId")
                         .IsUnique();

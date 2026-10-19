@@ -61,6 +61,11 @@ public class SdkReportService(DataContext db)
         if (errors.Count > 0)
             return (SdkReportAcceptStatus.ContractMismatch, errors);
 
+        // Повтор при доставке at least once — обычный случай. Проверка заранее избавляет от исключения и ошибки в логе EF
+        // на каждый повтор; одновременные повторы всё равно поймает уникальный индекс ниже
+        if (await db.Reports.AnyAsync(x => x.ReportId == request.ReportId, cancellationToken))
+            return (SdkReportAcceptStatus.Accepted, null);
+
         db.Reports.Add(
             new Report
             {
