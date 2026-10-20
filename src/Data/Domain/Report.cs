@@ -36,6 +36,11 @@ public class Report : BaseEntity
     public ValidationStatus Status { get; set; }
 
     /// <summary>
+    /// Время формирования отчёта в SDK, UTC. Берётся из первой доставки и уходит в Monitoring без изменений при повторах
+    /// </summary>
+    public DateTime Timestamp { get; set; }
+
+    /// <summary>
     /// Нарушения в формате ContractWatcher.Common. Пусто, если проверка прошла
     /// </summary>
     public List<ValidationViolation> Violations { get; set; } = [];

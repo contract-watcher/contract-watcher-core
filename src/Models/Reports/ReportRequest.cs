@@ -11,11 +11,13 @@ namespace ContractWatcher.Core.Models.Reports;
 /// </summary>
 /// <param name="Slug">Slug контракта в интеграции ключа</param>
 /// <param name="Status">Nullable, чтобы отсутствующий в запросе статус не превратился в Passed</param>
+/// <param name="Timestamp">Время формирования отчёта в SDK. Nullable, чтобы отсутствующее в запросе время не превратилось в 0001-01-01</param>
 public record ReportRequest(
     string Slug,
     Guid ReportId,
     int ContractVersion,
     ValidationStatus? Status,
+    DateTimeOffset? Timestamp,
     List<ValidationViolation> Violations
 );
 
@@ -35,6 +37,12 @@ public class ReportRequestValidator : AbstractValidator<ReportRequest>
         RuleFor(x => x.ContractVersion).GreaterThan(0);
         // JsonStringEnumConverter принимает и числа, поэтому неизвестное значение может прийти как число
         RuleFor(x => x.Status).NotNull().IsInEnum();
+        // В ValidationReport время не required: SDK, который его не заполнил, пришлёт 0001-01-01, а не null.
+        // NotEmpty у nullable сравнивает с null, а не с 0001-01-01, поэтому сравнение явное
+        RuleFor(x => x.Timestamp)
+            .NotNull()
+            .NotEqual(default(DateTimeOffset))
+            .WithMessage("Timestamp must be set");
         RuleFor(x => x.Violations).NotNull();
         RuleFor(x => x.Violations)
             .Empty()

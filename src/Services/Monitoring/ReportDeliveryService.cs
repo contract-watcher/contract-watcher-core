@@ -37,7 +37,13 @@ public class ReportDeliveryService(
             var request = new MonitoringReportRequest(
                 report.Contract.IntegrationId,
                 report.ContractId,
-                new MonitoringReport(report.ReportId, report.ContractVersion, report.Status, report.Violations)
+                new MonitoringReport(
+                    report.ReportId,
+                    report.ContractVersion,
+                    report.Status,
+                    report.Timestamp,
+                    report.Violations
+                )
             );
 
             var (status, error) = await monitoringClient.SendReportAsync(request, cancellationToken);
