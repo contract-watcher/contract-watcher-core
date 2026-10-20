@@ -13,4 +13,13 @@ public abstract class ApiControllerBase : ControllerBase
 
     protected ActionResult ValidationFailed(ValidationResult validation) =>
         ValidationProblem(new ValidationProblemDetails(validation.ToDictionary()));
+
+    /// <summary>
+    /// Monitoring не ответил: фронт показывает title вместо пустого списка
+    /// </summary>
+    protected ActionResult MonitoringUnavailable() =>
+        Problem(
+            title: "Monitoring is unavailable, try again later",
+            statusCode: StatusCodes.Status503ServiceUnavailable
+        );
 }

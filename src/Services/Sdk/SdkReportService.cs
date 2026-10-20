@@ -1,6 +1,8 @@
 using ContractWatcher.Common.Contracts;
 using ContractWatcher.Common.Enums;
 using ContractWatcher.Core.Data;
+using ContractWatcher.Core.Data.Domain;
+using ContractWatcher.Core.Extensions;
 using ContractWatcher.Core.Models.Reports;
 using Microsoft.EntityFrameworkCore;
 
@@ -23,6 +25,7 @@ public class SdkReportService(DataContext db)
 {
     /// <summary>
     /// Приём отчёта со сверкой по правилам указанной в нём опубликованной версии контракта.
+    /// Принятый отчёт сохраняется; повторная доставка того же ReportId тоже возвращает Accepted.
     /// Errors заполнены только при ContractMismatch: ключ — поле запроса, значение — расхождения с версией
     /// </summary>
     public async Task<(SdkReportAcceptStatus Status, Dictionary<string, string[]>? Errors)> AcceptAsync(
@@ -57,6 +60,29 @@ public class SdkReportService(DataContext db)
         var errors = CheckViolations(request.Violations, rules);
         if (errors.Count > 0)
             return (SdkReportAcceptStatus.ContractMismatch, errors);
+
+        db.Reports.Add(
+            new Report
+            {
+                ContractId = contractId.Value,
+                ReportId = request.ReportId,
+                ContractVersion = request.ContractVersion,
+                // Наличие статуса проверил валидатор запроса
+                Status = request.Status!.Value,
+                Violations = request.Violations,
+            }
+        );
+
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException e) when (e.IsUniqueViolation())
+        {
+            // Доставка at least once: SDK может прислать тот же отчёт повторно, например если не дождался ответа.
+            // Отчёт с этим ReportId уже сохранён, первая запись не меняется.
+            // Проверки до вставки нет намеренно: повтор редкий, а лишний запрос был бы на каждый отчёт
+        }
 
         return (SdkReportAcceptStatus.Accepted, null);
     }

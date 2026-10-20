@@ -242,6 +242,57 @@ namespace ContractWatcher.Core.Data.Migrations
                     b.ToTable("RefreshTokens");
                 });
 
+            modelBuilder.Entity("ContractWatcher.Core.Data.Domain.Report", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ContractId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("ContractVersion")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DeliveredAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DeliveryError")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<Guid>("ReportId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Violations")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ContractId");
+
+                    b.HasIndex("CreatedAt")
+                        .HasDatabaseName("IX_Reports_PendingDelivery")
+                        .HasFilter("\"DeliveredAt\" IS NULL AND \"DeliveryError\" IS NULL");
+
+                    b.HasIndex("ReportId")
+                        .IsUnique();
+
+                    b.ToTable("Reports");
+                });
+
             modelBuilder.Entity("ContractWatcher.Core.Data.Domain.User", b =>
                 {
                     b.Property<Guid>("Id")
@@ -341,6 +392,17 @@ namespace ContractWatcher.Core.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("ContractWatcher.Core.Data.Domain.Report", b =>
+                {
+                    b.HasOne("ContractWatcher.Core.Data.Domain.Contract", "Contract")
+                        .WithMany()
+                        .HasForeignKey("ContractId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Contract");
                 });
 
             modelBuilder.Entity("ContractWatcher.Core.Data.Domain.Contract", b =>

@@ -12,6 +12,7 @@ public class DataContext(DbContextOptions options) : DbContext(options)
     public DbSet<ApiKey> ApiKeys => Set<ApiKey>();
     public DbSet<Contract> Contracts => Set<Contract>();
     public DbSet<ContractVersion> ContractVersions => Set<ContractVersion>();
+    public DbSet<Report> Reports => Set<Report>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
