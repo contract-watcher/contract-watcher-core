@@ -67,8 +67,10 @@ public class SdkReportService(DataContext db)
                 ContractId = contractId.Value,
                 ReportId = request.ReportId,
                 ContractVersion = request.ContractVersion,
-                // Наличие статуса проверил валидатор запроса
+                // Наличие статуса и времени проверил валидатор запроса
                 Status = request.Status!.Value,
+                // Npgsql пишет в timestamp with time zone только UTC, поэтому время SDK переводится в UTC
+                Timestamp = request.Timestamp!.Value.UtcDateTime,
                 Violations = request.Violations,
             }
         );

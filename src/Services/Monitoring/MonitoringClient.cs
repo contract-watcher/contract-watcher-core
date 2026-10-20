@@ -122,6 +122,14 @@ public class MonitoringClient(HttpClient httpClient)
         );
 
     /// <summary>
+    /// Сводка интеграции. Для интеграции без отчётов Monitoring возвращает нули, а не 404
+    /// </summary>
+    public Task<(MonitoringReadStatus Status, MonitoringIntegrationSummary? Summary, string? Error)> GetSummaryAsync(
+        Guid integrationId,
+        CancellationToken cancellationToken
+    ) => GetAsync<MonitoringIntegrationSummary>($"internal/v1/integrations/{integrationId}/summary", cancellationToken);
+
+    /// <summary>
     /// Отправка отчёта. Error — описание ошибки для Rejected и Unavailable
     /// </summary>
     public async Task<(MonitoringDeliveryStatus Status, string? Error)> SendReportAsync(

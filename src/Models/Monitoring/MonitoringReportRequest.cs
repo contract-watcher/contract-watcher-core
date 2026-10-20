@@ -11,9 +11,11 @@ public record MonitoringReportRequest(Guid IntegrationId, Guid ContractId, Monit
 /// <summary>
 /// Отчёт в запросе к Monitoring. Поля ValidationReport без slug: контракт Monitoring получает по contractId
 /// </summary>
+/// <param name="Timestamp">Время формирования отчёта в SDK. Читается из базы, поэтому в UTC с Z и с точностью до микросекунд</param>
 public record MonitoringReport(
     Guid ReportId,
     int ContractVersion,
     ValidationStatus Status,
+    DateTime Timestamp,
     List<ValidationViolation> Violations
 );
