@@ -51,7 +51,19 @@ public class Report : BaseEntity
     public DateTime? DeliveredAt { get; set; }
 
     /// <summary>
-    /// Почему Monitoring отклонил отчёт. Если заполнено, отчёт больше не отправляется
+    /// Почему отчёт отложен: Monitoring отклонил его (400) или MaxDeliveryAttempts раз не смог обработать (500).
+    /// Отложенный отчёт выпадает из очереди и раз в ParkedRetryHours получает ещё одну попытку
     /// </summary>
     public string? DeliveryError { get; set; }
+
+    /// <summary>
+    /// Сколько раз Monitoring не смог обработать отчёт, пока принимал остальные. Недоступность Monitoring не считается
+    /// </summary>
+    public int DeliveryAttempts { get; set; }
+
+    /// <summary>
+    /// Раньше этого времени отчёт не отправляется. Null — отправлять сразу.
+    /// У отложенного отчёта — когда вернуть его в очередь на ежедневную попытку
+    /// </summary>
+    public DateTime? NextAttemptAt { get; set; }
 }

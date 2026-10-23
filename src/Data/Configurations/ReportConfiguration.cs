@@ -43,6 +43,12 @@ public class ReportConfiguration : IEntityTypeConfiguration<Report>
             .HasDatabaseName("IX_Reports_PendingDelivery")
             .HasFilter("\"DeliveredAt\" IS NULL AND \"DeliveryError\" IS NULL");
 
+        // Отложенные отчёты для ежедневного повтора: их мало, проверка каждого прохода worker'а не читает всю таблицу
+        builder
+            .HasIndex(x => x.NextAttemptAt)
+            .HasDatabaseName("IX_Reports_Parked")
+            .HasFilter("\"DeliveryError\" IS NOT NULL");
+
         builder
             .HasOne(x => x.Contract)
             .WithMany()

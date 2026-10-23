@@ -27,7 +27,11 @@ public static class MonitoringExtension
             }
         );
 
-        services.AddScoped<ReportDeliveryService>().AddHostedService<ReportDeliveryWorker>();
+        // Предохранитель — singleton: его состояние должно жить между проходами worker'а
+        services
+            .AddSingleton<MonitoringCircuitBreaker>()
+            .AddScoped<ReportDeliveryService>()
+            .AddHostedService<ReportDeliveryWorker>();
 
         return services;
     }
