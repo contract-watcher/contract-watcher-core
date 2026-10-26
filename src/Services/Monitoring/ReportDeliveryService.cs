@@ -1,3 +1,4 @@
+using ContractWatcher.Common.Enums;
 using ContractWatcher.Core.Data;
 using ContractWatcher.Core.Data.Domain;
 using ContractWatcher.Core.Models.Monitoring;
@@ -49,6 +50,8 @@ public class ReportDeliveryService(
             .Take(take)
             .ToListAsync(cancellationToken);
 
+        var notifiedSince = await GetNotifiedSinceAsync(reports, cancellationToken);
+
         foreach (var report in reports)
         {
             // Неудача засчитывается отчёту, только если Monitoring в целом принимает отчёты
@@ -62,6 +65,13 @@ public class ReportDeliveryService(
                 case MonitoringDeliveryStatus.Delivered:
                     breaker.OnSuccess();
                     report.DeliveredAt = now;
+                    // Неуспешная проверка — повод для письма владельцу. Отметка сохраняется вместе с DeliveredAt:
+                    // к моменту письма отчёт уже есть в истории, а повтор доставки второго письма не вызовет.
+                    // Отчёты, принятые до включения уведомлений, писем не вызывают
+                    report.FailureNotificationPending =
+                        report.Status == ValidationStatus.Failed
+                        && notifiedSince.TryGetValue(report.Contract.IntegrationId, out var since)
+                        && report.CreatedAt >= since;
                     break;
 
                 case MonitoringDeliveryStatus.Rejected:
@@ -96,6 +106,26 @@ public class ReportDeliveryService(
         }
 
         return reports.Count == take;
+    }
+
+    // С какого момента интеграции неуспешных отчётов пачки ждут писем. Нет в словаре — уведомления выключены
+    private async Task<Dictionary<Guid, DateTime>> GetNotifiedSinceAsync(
+        List<Report> reports,
+        CancellationToken cancellationToken
+    )
+    {
+        var integrationIds = reports
+            .Where(x => x.Status == ValidationStatus.Failed)
+            .Select(x => x.Contract.IntegrationId)
+            .Distinct()
+            .ToList();
+        if (integrationIds.Count == 0)
+            return [];
+
+        return await db
+            .IntegrationEmailNotifications.AsNoTracking()
+            .Where(x => integrationIds.Contains(x.IntegrationId))
+            .ToDictionaryAsync(x => x.IntegrationId, x => x.CreatedAt, cancellationToken);
     }
 
     private void CountFailedAttempt(Report report, string error, DateTime now)

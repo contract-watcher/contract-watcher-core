@@ -28,6 +28,7 @@ builder.Services.AddDataContext<DataContext>(
 
 builder.Services.AddAuth(builder.Configuration);
 builder.Services.AddMonitoring(builder.Configuration);
+builder.Services.AddNotifications(builder.Configuration);
 
 builder.Services
     .AddScoped<ProjectService>()

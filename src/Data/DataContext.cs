@@ -13,6 +13,8 @@ public class DataContext(DbContextOptions options) : DbContext(options)
     public DbSet<Contract> Contracts => Set<Contract>();
     public DbSet<ContractVersion> ContractVersions => Set<ContractVersion>();
     public DbSet<Report> Reports => Set<Report>();
+    public DbSet<IntegrationEmailNotification> IntegrationEmailNotifications => Set<IntegrationEmailNotification>();
+    public DbSet<EmailMessage> EmailMessages => Set<EmailMessage>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

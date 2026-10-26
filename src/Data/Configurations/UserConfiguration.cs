@@ -12,6 +12,12 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(x => x.PasswordHash).HasMaxLength(256);
         builder.Property(x => x.Name).HasMaxLength(User.NameMaxLength);
 
+        builder.Property(x => x.EmailConfirmationTokenHash).HasMaxLength(64);
+
         builder.HasIndex(x => x.Email).IsUnique();
+        builder
+            .HasIndex(x => x.EmailConfirmationTokenHash)
+            .IsUnique()
+            .HasFilter("\"EmailConfirmationTokenHash\" IS NOT NULL");
     }
 }

@@ -49,6 +49,13 @@ public class ReportConfiguration : IEntityTypeConfiguration<Report>
             .HasDatabaseName("IX_Reports_Parked")
             .HasFilter("\"DeliveryError\" IS NOT NULL");
 
+        // Неуспешные отчёты, которые ждут письма: их мало, проход worker'а уведомлений не читает всю таблицу.
+        // Индекс именованный, иначе он слился бы с другим индексом на тех же столбцах, и не по ContractId:
+        // такой индекс EF считает покрывающим внешний ключ и удаляет обычный IX_Reports_ContractId
+        builder
+            .HasIndex(x => x.Timestamp, "IX_Reports_FailureNotificationPending")
+            .HasFilter("\"FailureNotificationPending\"");
+
         builder
             .HasOne(x => x.Contract)
             .WithMany()

@@ -66,4 +66,10 @@ public class Report : BaseEntity
     /// У отложенного отчёта — когда вернуть его в очередь на ежедневную попытку
     /// </summary>
     public DateTime? NextAttemptAt { get; set; }
+
+    /// <summary>
+    /// Неуспешный отчёт доставлен в Monitoring и ещё не вошёл в письмо владельцу проекта.
+    /// Ставится в одной транзакции с DeliveredAt, снимается в одной транзакции с постановкой письма в очередь
+    /// </summary>
+    public bool FailureNotificationPending { get; set; }
 }
