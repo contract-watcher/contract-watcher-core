@@ -142,6 +142,57 @@ namespace ContractWatcher.Core.Data.Migrations
                     b.ToTable("ContractVersions");
                 });
 
+            modelBuilder.Entity("ContractWatcher.Core.Data.Domain.EmailMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("FailedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTime>("NextAttemptAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("SentAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<string>("To")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("NextAttemptAt")
+                        .HasDatabaseName("IX_EmailMessages_Pending")
+                        .HasFilter("\"SentAt\" IS NULL AND \"FailedAt\" IS NULL");
+
+                    b.ToTable("EmailMessages");
+                });
+
             modelBuilder.Entity("ContractWatcher.Core.Data.Domain.Integration", b =>
                 {
                     b.Property<Guid>("Id")
@@ -177,6 +228,32 @@ namespace ContractWatcher.Core.Data.Migrations
                         .IsUnique();
 
                     b.ToTable("Integrations");
+                });
+
+            modelBuilder.Entity("ContractWatcher.Core.Data.Domain.IntegrationEmailNotification", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("IntegrationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("LastEmailAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IntegrationId")
+                        .IsUnique();
+
+                    b.ToTable("IntegrationEmailNotifications");
                 });
 
             modelBuilder.Entity("ContractWatcher.Core.Data.Domain.Project", b =>
@@ -260,9 +337,18 @@ namespace ContractWatcher.Core.Data.Migrations
                     b.Property<DateTime?>("DeliveredAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<int>("DeliveryAttempts")
+                        .HasColumnType("integer");
+
                     b.Property<string>("DeliveryError")
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
+
+                    b.Property<bool>("FailureNotificationPending")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("NextAttemptAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid>("ReportId")
                         .HasColumnType("uuid");
@@ -290,8 +376,15 @@ namespace ContractWatcher.Core.Data.Migrations
                         .HasDatabaseName("IX_Reports_PendingDelivery")
                         .HasFilter("\"DeliveredAt\" IS NULL AND \"DeliveryError\" IS NULL");
 
+                    b.HasIndex("NextAttemptAt")
+                        .HasDatabaseName("IX_Reports_Parked")
+                        .HasFilter("\"DeliveryError\" IS NOT NULL");
+
                     b.HasIndex("ReportId")
                         .IsUnique();
+
+                    b.HasIndex(new[] { "Timestamp" }, "IX_Reports_FailureNotificationPending")
+                        .HasFilter("\"FailureNotificationPending\"");
 
                     b.ToTable("Reports");
                 });
@@ -310,6 +403,19 @@ namespace ContractWatcher.Core.Data.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
 
+                    b.Property<DateTime?>("EmailConfirmationExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("EmailConfirmationSentAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("EmailConfirmationTokenHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime?>("EmailConfirmedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -327,6 +433,10 @@ namespace ContractWatcher.Core.Data.Migrations
 
                     b.HasIndex("Email")
                         .IsUnique();
+
+                    b.HasIndex("EmailConfirmationTokenHash")
+                        .IsUnique()
+                        .HasFilter("\"EmailConfirmationTokenHash\" IS NOT NULL");
 
                     b.ToTable("Users");
                 });
@@ -373,6 +483,17 @@ namespace ContractWatcher.Core.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("Project");
+                });
+
+            modelBuilder.Entity("ContractWatcher.Core.Data.Domain.IntegrationEmailNotification", b =>
+                {
+                    b.HasOne("ContractWatcher.Core.Data.Domain.Integration", "Integration")
+                        .WithOne()
+                        .HasForeignKey("ContractWatcher.Core.Data.Domain.IntegrationEmailNotification", "IntegrationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Integration");
                 });
 
             modelBuilder.Entity("ContractWatcher.Core.Data.Domain.Project", b =>

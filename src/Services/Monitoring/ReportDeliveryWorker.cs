@@ -3,7 +3,8 @@ using Microsoft.Extensions.Options;
 namespace ContractWatcher.Core.Services.Monitoring;
 
 /// <summary>
-/// Фоновая доставка отчётов в Monitoring: раз в PollIntervalSeconds отправляет все недоставленные отчёты
+/// Фоновая доставка отчётов в Monitoring: раз в PollIntervalSeconds возвращает в очередь отложенные отчёты,
+/// у которых подошла ежедневная попытка, и отправляет все отчёты, готовые к отправке
 /// </summary>
 public class ReportDeliveryWorker(
     IServiceScopeFactory scopeFactory,
@@ -32,6 +33,9 @@ public class ReportDeliveryWorker(
     {
         try
         {
+            await using (var scope = scopeFactory.CreateAsyncScope())
+                await scope.ServiceProvider.GetRequiredService<ReportDeliveryService>().RequeueParkedAsync(stoppingToken);
+
             bool hasMore;
             do
             {

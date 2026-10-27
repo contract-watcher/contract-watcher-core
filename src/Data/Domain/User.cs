@@ -24,6 +24,26 @@ public class User : BaseEntity
     public required string Name { get; set; }
 
     /// <summary>
+    /// Когда пользователь подтвердил email. Null — не подтверждён: уведомления на такой адрес не отправляются
+    /// </summary>
+    public DateTime? EmailConfirmedAt { get; set; }
+
+    /// <summary>
+    /// Хеш токена из последнего письма подтверждения. Сам токен не хранится
+    /// </summary>
+    public string? EmailConfirmationTokenHash { get; set; }
+
+    /// <summary>
+    /// Когда отправлено последнее письмо подтверждения. По нему ограничивается частота повторных писем
+    /// </summary>
+    public DateTime? EmailConfirmationSentAt { get; set; }
+
+    /// <summary>
+    /// До какого момента действует токен подтверждения
+    /// </summary>
+    public DateTime? EmailConfirmationExpiresAt { get; set; }
+
+    /// <summary>
     /// Проекты пользователя
     /// </summary>
     public List<Project> Projects { get; set; } = [];

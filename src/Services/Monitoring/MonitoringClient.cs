@@ -23,6 +23,11 @@ public enum MonitoringDeliveryStatus
     Rejected,
 
     /// <summary>
+    /// Monitoring работает, но не смог обработать этот отчёт (500). Возможно, дело в самом отчёте
+    /// </summary>
+    Failed,
+
+    /// <summary>
     /// Monitoring недоступен или ответил ошибкой, не связанной с отчётом: отправить позже
     /// </summary>
     Unavailable,
@@ -148,11 +153,15 @@ public class MonitoringClient(HttpClient httpClient)
             var body = await response.Content.ReadAsStringAsync(cancellationToken);
             var error = $"Monitoring returned HTTP {(int)response.StatusCode}: {body}";
 
-            // Только 400 зависит от самого отчёта. 404, 415, 5xx и прочие — ошибка адреса или окружения,
-            // их нельзя записывать на отчёт, иначе при неверной настройке отложатся все отчёты
-            return response.StatusCode == HttpStatusCode.BadRequest
-                ? (MonitoringDeliveryStatus.Rejected, error)
-                : (MonitoringDeliveryStatus.Unavailable, error);
+            // 400 — отчёт некорректен. 500 — Monitoring не смог обработать именно этот отчёт (общий сбой хранилища он
+            // отдаёт как 503). 404, 415, 503 и прочие — ошибка адреса или окружения, их нельзя записывать на отчёт,
+            // иначе при неверной настройке отложатся все отчёты
+            return response.StatusCode switch
+            {
+                HttpStatusCode.BadRequest => (MonitoringDeliveryStatus.Rejected, error),
+                HttpStatusCode.InternalServerError => (MonitoringDeliveryStatus.Failed, error),
+                _ => (MonitoringDeliveryStatus.Unavailable, error),
+            };
         }
         catch (HttpRequestException e)
         {

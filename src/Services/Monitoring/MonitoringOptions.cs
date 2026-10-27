@@ -33,5 +33,54 @@ public class MonitoringOptions
     /// </summary>
     [Range(1, 300)]
     public int RequestTimeoutSeconds { get; set; }
+
+    /// <summary>
+    /// Сколько раз Monitoring может не обработать отчёт (500), прежде чем отчёт будет отложен
+    /// </summary>
+    [Range(1, 100)]
+    public int MaxDeliveryAttempts { get; set; }
+
+    /// <summary>
+    /// Пауза перед повтором отчёта после первой неудачи, в секундах. Дальше удваивается
+    /// </summary>
+    [Range(1, 3600)]
+    public int RetryDelaySeconds { get; set; }
+
+    /// <summary>
+    /// Потолок паузы перед повтором отчёта, в секундах
+    /// </summary>
+    [Range(1, 86400)]
+    public int MaxRetryDelaySeconds { get; set; }
+
+    /// <summary>
+    /// Через сколько часов отложенный отчёт автоматически получает ещё одну попытку
+    /// </summary>
+    [Range(1, 720)]
+    public int ParkedRetryHours { get; set; }
+
+    /// <summary>
+    /// Сколько неудач подряд размыкают предохранитель
+    /// </summary>
+    [Range(1, 100)]
+    public int BreakerThreshold { get; set; }
+
+    /// <summary>
+    /// Неудачи считаются подряд, только если между ними не больше этого окна, в секундах.
+    /// Должно быть больше PollIntervalSeconds, иначе недоступность Monitoring не разомкнёт предохранитель
+    /// </summary>
+    [Range(1, 3600)]
+    public int BreakerWindowSeconds { get; set; }
+
+    /// <summary>
+    /// Первая пауза разомкнутого предохранителя, в секундах. Дальше удваивается
+    /// </summary>
+    [Range(1, 3600)]
+    public int BreakerDelaySeconds { get; set; }
+
+    /// <summary>
+    /// Потолок паузы предохранителя, в секундах
+    /// </summary>
+    [Range(1, 86400)]
+    public int MaxBreakerDelaySeconds { get; set; }
 }
 

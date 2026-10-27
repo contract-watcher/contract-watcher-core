@@ -2,6 +2,7 @@ using ContractWatcher.Core.Extensions;
 using ContractWatcher.Core.Models.Auth;
 using ContractWatcher.Core.Services.Auth;
 using FluentValidation;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 
@@ -95,6 +96,56 @@ public class AuthController(AuthService authService) : ApiControllerBase
             return ValidationFailed(validation);
 
         await authService.LogoutAsync(request.RefreshToken, cancellationToken);
+        return NoContent();
+    }
+
+    /// <summary>
+    /// Письмо со ссылкой подтверждения email: без подтверждения письма о неуспешных проверках не включаются.
+    /// Уже подтверждён — 409, повтор раньше чем через минуту — 429
+    /// </summary>
+    [Authorize]
+    [HttpPost("email-confirmation")]
+    public async Task<IActionResult> RequestEmailConfirmation(
+        [FromServices] EmailConfirmationService emailConfirmationService,
+        CancellationToken cancellationToken
+    )
+    {
+        var status = await emailConfirmationService.RequestAsync(CurrentUserId, cancellationToken);
+
+        if (status == EmailConfirmationRequestStatus.AlreadyConfirmed)
+            return Problem(title: "Email is already confirmed", statusCode: StatusCodes.Status409Conflict);
+
+        if (status == EmailConfirmationRequestStatus.TooSoon)
+            return Problem(
+                title: "Confirmation email was sent recently, try again in a minute",
+                statusCode: StatusCodes.Status429TooManyRequests
+            );
+
+        // Письмо поставлено в очередь, а не отправлено
+        return Accepted();
+    }
+
+    /// <summary>
+    /// Подтверждение email токеном из письма. Неизвестный, использованный или истёкший токен — 400
+    /// </summary>
+    [HttpPost("email-confirmation/confirm")]
+    public async Task<IActionResult> ConfirmEmail(
+        ConfirmEmailRequest request,
+        [FromServices] IValidator<ConfirmEmailRequest> validator,
+        [FromServices] EmailConfirmationService emailConfirmationService,
+        CancellationToken cancellationToken
+    )
+    {
+        var validation = await validator.ValidateAsync(request, cancellationToken);
+        if (!validation.IsValid)
+            return ValidationFailed(validation);
+
+        if (!await emailConfirmationService.ConfirmAsync(request.Token, cancellationToken))
+            return Problem(
+                title: "Confirmation link is invalid or expired",
+                statusCode: StatusCodes.Status400BadRequest
+            );
+
         return NoContent();
     }
 }
