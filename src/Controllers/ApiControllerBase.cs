@@ -11,8 +11,13 @@ public abstract class ApiControllerBase : ControllerBase
     /// </summary>
     protected Guid CurrentUserId => User.GetUserId();
 
-    protected ActionResult ValidationFailed(ValidationResult validation) =>
-        ValidationProblem(new ValidationProblemDetails(validation.ToDictionary()));
+    protected ActionResult ValidationFailed(ValidationResult validation) => ValidationFailed(validation.ToDictionary());
+
+    /// <summary>
+    /// 400 с ошибками по полям в том же формате, что и проверка запроса: имя поля — сообщения
+    /// </summary>
+    protected ActionResult ValidationFailed(IDictionary<string, string[]> errors) =>
+        ValidationProblem(new ValidationProblemDetails(errors));
 
     /// <summary>
     /// Monitoring не ответил: фронт показывает title вместо пустого списка

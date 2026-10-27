@@ -1,4 +1,5 @@
 using ContractWatcher.Core.Models.Contracts;
+using ContractWatcher.Core.Models.Reports;
 using ContractWatcher.Core.Services.Contracts;
 using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
@@ -26,7 +27,29 @@ public class ContractsController(ContractService contractService) : ApiControlle
 
         return contracts;
     }
-    
+
+    /// <summary>
+    /// Контракты для выбора в фильтре истории: страницами, по названию, поиск по началу названия без учёта регистра
+    /// </summary>
+    [HttpGet("search")]
+    public async Task<ActionResult<PageResponse<ContractSearchItemResponse>>> Search(
+        Guid integrationId,
+        [FromQuery] ContractSearchQuery query,
+        [FromServices] IValidator<ContractSearchQuery> validator,
+        CancellationToken cancellationToken
+    )
+    {
+        var validation = await validator.ValidateAsync(query, cancellationToken);
+        if (!validation.IsValid)
+            return ValidationFailed(validation);
+
+        var page = await contractService.SearchAsync(CurrentUserId, integrationId, query, cancellationToken);
+        if (page is null)
+            return NotFound();
+
+        return page;
+    }
+
     /// <summary>
     /// Контракт по ID
     /// </summary>

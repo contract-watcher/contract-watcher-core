@@ -46,10 +46,29 @@ public enum MonitoringReadStatus
     NotFound,
 
     /// <summary>
+    /// Monitoring отклонил параметры запроса (400 INVALID_REQUEST), например границы периода
+    /// </summary>
+    InvalidRequest,
+
+    /// <summary>
     /// Monitoring недоступен или ответил ошибкой
     /// </summary>
     Unavailable,
 }
+
+/// <summary>
+/// Ответ Monitoring на чтение
+/// </summary>
+/// <param name="Value">Прочитанные данные. Есть только при Found</param>
+/// <param name="Error">Описание ошибки для журнала</param>
+/// <param name="InvalidParameters">Отклонённые параметры при InvalidRequest: имя параметра Monitoring — сообщения</param>
+public record MonitoringRead<T>(
+    MonitoringReadStatus Status,
+    T? Value = null,
+    string? Error = null,
+    Dictionary<string, string[]>? InvalidParameters = null
+)
+    where T : class;
 
 /// <summary>
 /// HTTP-клиент внутреннего API Monitoring
@@ -57,6 +76,7 @@ public enum MonitoringReadStatus
 public class MonitoringClient(HttpClient httpClient)
 {
     private const string ReportsPath = "internal/v1/reports";
+    private const string InvalidRequestCode = "INVALID_REQUEST";
 
     // Monitoring принимает время только в UTC с Z и дробью до шести знаков
     private const string TimeFormat = "yyyy-MM-dd'T'HH:mm:ss.ffffff'Z'";
@@ -64,20 +84,28 @@ public class MonitoringClient(HttpClient httpClient)
     /// <summary>
     /// История проверок интеграции: фильтры и пагинация выполняются в Monitoring
     /// </summary>
-    public Task<(MonitoringReadStatus Status, PageResponse<ReportHistoryItemResponse>? Page, string? Error)>
-        GetReportHistoryAsync(Guid integrationId, ReportHistoryQuery query, CancellationToken cancellationToken)
+    public Task<MonitoringRead<PageResponse<ReportHistoryItemResponse>>> GetReportHistoryAsync(
+        Guid integrationId,
+        ReportHistoryQuery query,
+        CancellationToken cancellationToken
+    )
     {
         var parameters = new Dictionary<string, string?>
         {
-            ["from"] = query.From?.UtcDateTime.ToString(TimeFormat, CultureInfo.InvariantCulture),
-            ["to"] = query.To?.UtcDateTime.ToString(TimeFormat, CultureInfo.InvariantCulture),
+            ["from"] = FormatTime(query.From),
+            ["to"] = FormatTime(query.To),
             ["status"] = query.Status?.ToString(),
             ["offset"] = query.Offset.ToString(CultureInfo.InvariantCulture),
             ["limit"] = query.Limit.ToString(CultureInfo.InvariantCulture),
         };
 
+        // Выбранные контракты Monitoring принимает только повторяющимся параметром, не через запятую
+        var contracts = (query.ContractId ?? [])
+            .Distinct()
+            .Select(x => new KeyValuePair<string, string?>("contractId", x.ToString()));
+
         return GetAsync<PageResponse<ReportHistoryItemResponse>>(
-            WithQuery($"internal/v1/integrations/{integrationId}/reports", parameters),
+            WithQuery($"internal/v1/integrations/{integrationId}/reports", parameters.Concat(contracts)),
             cancellationToken
         );
     }
@@ -85,7 +113,7 @@ public class MonitoringClient(HttpClient httpClient)
     /// <summary>
     /// Подробности отчёта. NotFound — отчёта нет в этой интеграции
     /// </summary>
-    public Task<(MonitoringReadStatus Status, ReportDetailsResponse? Report, string? Error)> GetReportAsync(
+    public Task<MonitoringRead<ReportDetailsResponse>> GetReportAsync(
         Guid integrationId,
         Guid reportId,
         CancellationToken cancellationToken
@@ -98,8 +126,11 @@ public class MonitoringClient(HttpClient httpClient)
     /// <summary>
     /// Группы нарушений интеграции
     /// </summary>
-    public Task<(MonitoringReadStatus Status, PageResponse<ViolationGroupResponse>? Page, string? Error)>
-        GetViolationGroupsAsync(Guid integrationId, ViolationGroupsQuery query, CancellationToken cancellationToken)
+    public Task<MonitoringRead<PageResponse<ViolationGroupResponse>>> GetViolationGroupsAsync(
+        Guid integrationId,
+        ViolationGroupsQuery query,
+        CancellationToken cancellationToken
+    )
     {
         var parameters = new Dictionary<string, string?>
         {
@@ -116,7 +147,7 @@ public class MonitoringClient(HttpClient httpClient)
     /// <summary>
     /// Группа нарушений. NotFound — группы нет в этой интеграции
     /// </summary>
-    public Task<(MonitoringReadStatus Status, ViolationGroupResponse? Group, string? Error)> GetViolationGroupAsync(
+    public Task<MonitoringRead<ViolationGroupResponse>> GetViolationGroupAsync(
         Guid integrationId,
         Guid groupId,
         CancellationToken cancellationToken
@@ -127,12 +158,25 @@ public class MonitoringClient(HttpClient httpClient)
         );
 
     /// <summary>
-    /// Сводка интеграции. Для интеграции без отчётов Monitoring возвращает нули, а не 404
+    /// Сводка интеграции за период. Если отчётов в периоде нет, Monitoring возвращает нули, а не 404
     /// </summary>
-    public Task<(MonitoringReadStatus Status, MonitoringIntegrationSummary? Summary, string? Error)> GetSummaryAsync(
+    public Task<MonitoringRead<MonitoringIntegrationSummary>> GetSummaryAsync(
         Guid integrationId,
+        IntegrationSummaryQuery query,
         CancellationToken cancellationToken
-    ) => GetAsync<MonitoringIntegrationSummary>($"internal/v1/integrations/{integrationId}/summary", cancellationToken);
+    )
+    {
+        var parameters = new Dictionary<string, string?>
+        {
+            ["from"] = FormatTime(query.From),
+            ["to"] = FormatTime(query.To),
+        };
+
+        return GetAsync<MonitoringIntegrationSummary>(
+            WithQuery($"internal/v1/integrations/{integrationId}/summary", parameters),
+            cancellationToken
+        );
+    }
 
     /// <summary>
     /// Отправка отчёта. Error — описание ошибки для Rejected и Unavailable
@@ -174,10 +218,7 @@ public class MonitoringClient(HttpClient httpClient)
         }
     }
 
-    private async Task<(MonitoringReadStatus Status, T? Value, string? Error)> GetAsync<T>(
-        string path,
-        CancellationToken cancellationToken
-    )
+    private async Task<MonitoringRead<T>> GetAsync<T>(string path, CancellationToken cancellationToken)
         where T : class
     {
         try
@@ -186,37 +227,61 @@ public class MonitoringClient(HttpClient httpClient)
 
             // Неизвестный путь Monitoring отдаёт как 500, поэтому 404 — это именно «нет такого отчёта или группы»
             if (response.StatusCode == HttpStatusCode.NotFound)
-                return (MonitoringReadStatus.NotFound, null, null);
+                return new(MonitoringReadStatus.NotFound);
 
             if (!response.IsSuccessStatusCode)
             {
                 var body = await response.Content.ReadAsStringAsync(cancellationToken);
-                return (MonitoringReadStatus.Unavailable, null, $"Monitoring returned HTTP {(int)response.StatusCode}: {body}");
+                var error = $"Monitoring returned HTTP {(int)response.StatusCode}: {body}";
+
+                var invalidParameters =
+                    response.StatusCode == HttpStatusCode.BadRequest ? ParseInvalidParameters(body) : null;
+
+                return invalidParameters is null
+                    ? new(MonitoringReadStatus.Unavailable, Error: error)
+                    : new(MonitoringReadStatus.InvalidRequest, Error: error, InvalidParameters: invalidParameters);
             }
 
             var value = await response.Content.ReadFromJsonAsync<T>(cancellationToken);
             return value is null
-                ? (MonitoringReadStatus.Unavailable, null, "Monitoring returned an empty body")
-                : (MonitoringReadStatus.Found, value, null);
+                ? new(MonitoringReadStatus.Unavailable, Error: "Monitoring returned an empty body")
+                : new(MonitoringReadStatus.Found, value);
         }
         catch (HttpRequestException e)
         {
-            return (MonitoringReadStatus.Unavailable, null, $"Monitoring request failed: {e.Message}");
+            return new(MonitoringReadStatus.Unavailable, Error: $"Monitoring request failed: {e.Message}");
         }
         catch (JsonException e)
         {
-            return (MonitoringReadStatus.Unavailable, null, $"Monitoring returned unexpected JSON: {e.Message}");
+            return new(MonitoringReadStatus.Unavailable, Error: $"Monitoring returned unexpected JSON: {e.Message}");
         }
         catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            return (MonitoringReadStatus.Unavailable, null, "Monitoring request timed out");
+            return new(MonitoringReadStatus.Unavailable, Error: "Monitoring request timed out");
         }
     }
 
+    // Ошибки параметров из ответа 400 INVALID_REQUEST. Null — ответ другой, и дело не в параметрах запроса
+    private static Dictionary<string, string[]>? ParseInvalidParameters(string body)
+    {
+        try
+        {
+            var problem = JsonSerializer.Deserialize<MonitoringProblem>(body, JsonSerializerOptions.Web);
+            return problem is { Code: InvalidRequestCode, Errors.Count: > 0 } ? problem.Errors : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    private static string? FormatTime(DateTimeOffset? time) =>
+        time?.UtcDateTime.ToString(TimeFormat, CultureInfo.InvariantCulture);
+
     // Пустые параметры не передаются: Monitoring отклоняет параметр без значения
-    private static string WithQuery(string path, Dictionary<string, string?> parameters) =>
-        QueryHelpers.AddQueryString(
-            path,
-            parameters.Where(x => x.Value is not null).Select(x => new KeyValuePair<string, string?>(x.Key, x.Value))
-        );
+    private static string WithQuery(string path, IEnumerable<KeyValuePair<string, string?>> parameters) =>
+        QueryHelpers.AddQueryString(path, parameters.Where(x => x.Value is not null));
+
+    // Ошибка Monitoring в формате Problem Details: машинный код и сообщения по параметрам
+    private record MonitoringProblem(string? Code, Dictionary<string, string[]>? Errors);
 }

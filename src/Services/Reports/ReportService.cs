@@ -18,6 +18,11 @@ public enum ReportReadStatus
     NotFound,
 
     /// <summary>
+    /// Monitoring отклонил параметры запроса. Бывает только у истории и сводки, вместе с ошибками по параметрам
+    /// </summary>
+    InvalidRequest,
+
+    /// <summary>
     /// Monitoring недоступен
     /// </summary>
     MonitoringUnavailable,
@@ -32,21 +37,28 @@ public class ReportService(DataContext db, MonitoringClient monitoringClient, IL
     // Сколько последних групп нарушений показывать в сводке
     private const int SummaryViolationGroupLimit = 5;
 
-    public async Task<(ReportReadStatus Status, PageResponse<ReportHistoryItemResponse>? Page)> GetHistoryAsync(
-        Guid userId,
-        Guid integrationId,
-        ReportHistoryQuery query,
-        CancellationToken cancellationToken
-    )
+    /// <summary>
+    /// История проверок. InvalidParameters — ошибки по параметрам запроса, если Monitoring их отклонил
+    /// </summary>
+    public async Task<(
+        ReportReadStatus Status,
+        PageResponse<ReportHistoryItemResponse>? Page,
+        Dictionary<string, string[]>? InvalidParameters
+    )> GetHistoryAsync(Guid userId, Guid integrationId, ReportHistoryQuery query, CancellationToken cancellationToken)
     {
         if (!await IntegrationExistsAsync(userId, integrationId, cancellationToken))
-            return (ReportReadStatus.NotFound, null);
+            return (ReportReadStatus.NotFound, null, null);
 
-        var (status, page, error) = await monitoringClient.GetReportHistoryAsync(integrationId, query, cancellationToken);
-        if (status != MonitoringReadStatus.Found)
-            return (Fail(status, error), null);
+        var history = await monitoringClient.GetReportHistoryAsync(integrationId, query, cancellationToken);
+        if (history.Status != MonitoringReadStatus.Found)
+            return (
+                Fail(history.Status, history.Error, passInvalidRequest: true),
+                null,
+                ToQueryErrors(history.InvalidParameters)
+            );
 
-        var contracts = await GetContractsAsync(integrationId, page!.Items.Select(x => x.ContractId), cancellationToken);
+        var page = history.Value!;
+        var contracts = await GetContractsAsync(integrationId, page.Items.Select(x => x.ContractId), cancellationToken);
         var items = page
             .Items.Select(x =>
                 contracts.TryGetValue(x.ContractId, out var contract)
@@ -55,7 +67,7 @@ public class ReportService(DataContext db, MonitoringClient monitoringClient, IL
             )
             .ToList();
 
-        return (ReportReadStatus.Found, page with { Items = items });
+        return (ReportReadStatus.Found, page with { Items = items }, null);
     }
 
     public async Task<(ReportReadStatus Status, ReportDetailsResponse? Report)> GetReportAsync(
@@ -68,11 +80,12 @@ public class ReportService(DataContext db, MonitoringClient monitoringClient, IL
         if (!await IntegrationExistsAsync(userId, integrationId, cancellationToken))
             return (ReportReadStatus.NotFound, null);
 
-        var (status, report, error) = await monitoringClient.GetReportAsync(integrationId, reportId, cancellationToken);
-        if (status != MonitoringReadStatus.Found)
-            return (Fail(status, error), null);
+        var read = await monitoringClient.GetReportAsync(integrationId, reportId, cancellationToken);
+        if (read.Status != MonitoringReadStatus.Found)
+            return (Fail(read.Status, read.Error), null);
 
-        var contracts = await GetContractsAsync(integrationId, [report!.ContractId], cancellationToken);
+        var report = read.Value!;
+        var contracts = await GetContractsAsync(integrationId, [report.ContractId], cancellationToken);
         return contracts.TryGetValue(report.ContractId, out var contract)
             ? (ReportReadStatus.Found, report with { ContractSlug = contract.Slug, ContractName = contract.Name })
             : (ReportReadStatus.Found, report);
@@ -88,15 +101,12 @@ public class ReportService(DataContext db, MonitoringClient monitoringClient, IL
         if (!await IntegrationExistsAsync(userId, integrationId, cancellationToken))
             return (ReportReadStatus.NotFound, null);
 
-        var (status, page, error) = await monitoringClient.GetViolationGroupsAsync(
-            integrationId,
-            query,
-            cancellationToken
-        );
-        if (status != MonitoringReadStatus.Found)
-            return (Fail(status, error), null);
+        var groups = await monitoringClient.GetViolationGroupsAsync(integrationId, query, cancellationToken);
+        if (groups.Status != MonitoringReadStatus.Found)
+            return (Fail(groups.Status, groups.Error), null);
 
-        var contracts = await GetContractsAsync(integrationId, page!.Items.Select(x => x.ContractId), cancellationToken);
+        var page = groups.Value!;
+        var contracts = await GetContractsAsync(integrationId, page.Items.Select(x => x.ContractId), cancellationToken);
         var items = page
             .Items.Select(x =>
                 contracts.TryGetValue(x.ContractId, out var contract)
@@ -118,35 +128,38 @@ public class ReportService(DataContext db, MonitoringClient monitoringClient, IL
         if (!await IntegrationExistsAsync(userId, integrationId, cancellationToken))
             return (ReportReadStatus.NotFound, null);
 
-        var (status, group, error) = await monitoringClient.GetViolationGroupAsync(
-            integrationId,
-            groupId,
-            cancellationToken
-        );
-        if (status != MonitoringReadStatus.Found)
-            return (Fail(status, error), null);
+        var read = await monitoringClient.GetViolationGroupAsync(integrationId, groupId, cancellationToken);
+        if (read.Status != MonitoringReadStatus.Found)
+            return (Fail(read.Status, read.Error), null);
 
-        var contracts = await GetContractsAsync(integrationId, [group!.ContractId], cancellationToken);
+        var group = read.Value!;
+        var contracts = await GetContractsAsync(integrationId, [group.ContractId], cancellationToken);
         return contracts.TryGetValue(group.ContractId, out var contract)
             ? (ReportReadStatus.Found, group with { ContractSlug = contract.Slug, ContractName = contract.Name })
             : (ReportReadStatus.Found, group);
     }
 
     /// <summary>
-    /// Сводка по интеграции. Счётчики и время последнего отчёта считает Monitoring одним снимком,
-    /// групп в его сводке нет, поэтому они берутся первой страницей списка групп
+    /// Сводка по интеграции. Счётчики и время последнего отчёта за выбранный период считает Monitoring одним снимком.
+    /// Групп в его сводке нет, поэтому они берутся первой страницей списка групп — за всё время, без учёта периода.
+    /// InvalidParameters — ошибки по параметрам запроса, если Monitoring их отклонил
     /// </summary>
-    public async Task<(ReportReadStatus Status, IntegrationSummaryResponse? Summary)> GetSummaryAsync(
+    public async Task<(
+        ReportReadStatus Status,
+        IntegrationSummaryResponse? Summary,
+        Dictionary<string, string[]>? InvalidParameters
+    )> GetSummaryAsync(
         Guid userId,
         Guid integrationId,
+        IntegrationSummaryQuery query,
         CancellationToken cancellationToken
     )
     {
         if (!await IntegrationExistsAsync(userId, integrationId, cancellationToken))
-            return (ReportReadStatus.NotFound, null);
+            return (ReportReadStatus.NotFound, null, null);
 
         // Запросы независимы, поэтому идут параллельно. DbContext в это время не используется
-        var summaryTask = monitoringClient.GetSummaryAsync(integrationId, cancellationToken);
+        var summaryTask = monitoringClient.GetSummaryAsync(integrationId, query, cancellationToken);
         var groupsTask = monitoringClient.GetViolationGroupsAsync(
             integrationId,
             new ViolationGroupsQuery { Limit = SummaryViolationGroupLimit },
@@ -155,42 +168,70 @@ public class ReportService(DataContext db, MonitoringClient monitoringClient, IL
 
         var summary = await summaryTask;
         if (summary.Status != MonitoringReadStatus.Found)
-            return (Fail(summary.Status, summary.Error), null);
+            return (
+                Fail(summary.Status, summary.Error, passInvalidRequest: true),
+                null,
+                ToQueryErrors(summary.InvalidParameters)
+            );
 
         var groups = await groupsTask;
         if (groups.Status != MonitoringReadStatus.Found)
-            return (Fail(groups.Status, groups.Error), null);
+            return (Fail(groups.Status, groups.Error), null, null);
 
-        var contracts = await GetContractsAsync(integrationId, groups.Page!.Items.Select(x => x.ContractId), cancellationToken);
-        var latestGroups = groups
-            .Page.Items.Select(x =>
+        var groupPage = groups.Value!;
+        var contracts = await GetContractsAsync(
+            integrationId,
+            groupPage.Items.Select(x => x.ContractId),
+            cancellationToken
+        );
+        var latestGroups = groupPage
+            .Items.Select(x =>
                 contracts.TryGetValue(x.ContractId, out var contract)
                     ? x with { ContractSlug = contract.Slug, ContractName = contract.Name }
                     : x
             )
             .ToList();
 
+        var counters = summary.Value!;
         return (
             ReportReadStatus.Found,
             new IntegrationSummaryResponse(
-                summary.Summary!.TotalReports,
-                summary.Summary.PassedReports,
-                summary.Summary.FailedReports,
-                summary.Summary.LastReceivedAt,
-                groups.Page.Total,
+                counters.TotalReports,
+                counters.PassedReports,
+                counters.FailedReports,
+                counters.LastReceivedAt,
+                groupPage.Total,
                 latestGroups
-            )
+            ),
+            null
         );
     }
 
-    private ReportReadStatus Fail(MonitoringReadStatus status, string? error)
+    // Ошибки параметров передаются фронту только из истории и сводки. В остальных запросах отказ Monitoring в
+    // параметрах — сбой обмена: их формирует Core или проверяет по тем же правилам
+    private ReportReadStatus Fail(MonitoringReadStatus status, string? error, bool passInvalidRequest = false)
     {
         if (status == MonitoringReadStatus.NotFound)
             return ReportReadStatus.NotFound;
 
+        if (status == MonitoringReadStatus.InvalidRequest && passInvalidRequest)
+        {
+            // Core проверяет те же правила, поэтому отказ Monitoring значит, что правила разошлись
+            logger.LogWarning("Monitoring rejected request parameters: {Error}", error);
+            return ReportReadStatus.InvalidRequest;
+        }
+
         logger.LogWarning("Reading from Monitoring failed: {Error}", error);
         return ReportReadStatus.MonitoringUnavailable;
     }
+
+    // Параметры Monitoring называются так же, как параметры запроса Core. Ключи приводятся к виду собственных ошибок
+    // валидации Core: «contractId» → «ContractId»
+    private static Dictionary<string, string[]>? ToQueryErrors(Dictionary<string, string[]>? invalidParameters) =>
+        invalidParameters?.ToDictionary(
+            x => x.Key.Length == 0 ? x.Key : char.ToUpperInvariant(x.Key[0]) + x.Key[1..],
+            x => x.Value
+        );
 
     private Task<bool> IntegrationExistsAsync(Guid userId, Guid integrationId, CancellationToken cancellationToken) =>
         db.Integrations.AnyAsync(x => x.Id == integrationId && x.Project.OwnerId == userId, cancellationToken);

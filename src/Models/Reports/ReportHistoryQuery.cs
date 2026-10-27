@@ -10,6 +10,13 @@ public class ReportHistoryQuery
 {
     public const int DefaultLimit = 20;
     public const int MaxLimit = 100;
+    public const int MaxContractIds = 50;
+
+    /// <summary>
+    /// Выбранные контракты, параметр повторяется: contractId=A&amp;contractId=C. Отчёты любого из них, всех версий.
+    /// Null — все контракты
+    /// </summary>
+    public List<Guid>? ContractId { get; set; }
 
     /// <summary>
     /// Нижняя граница времени приёма отчёта, включительно
@@ -44,6 +51,11 @@ public class ReportHistoryQueryValidator : AbstractValidator<ReportHistoryQuery>
 {
     public ReportHistoryQueryValidator()
     {
+        // Monitoring считает вхождения до удаления повторов
+        RuleFor(x => x.ContractId)
+            .Must(x => x!.Count <= ReportHistoryQuery.MaxContractIds)
+            .When(x => x.ContractId is not null)
+            .WithMessage($"At most {ReportHistoryQuery.MaxContractIds} 'contractId' values are allowed");
         RuleFor(x => x.To)
             .GreaterThan(x => x.From)
             .When(x => x.From is not null && x.To is not null)

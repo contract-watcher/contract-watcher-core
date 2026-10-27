@@ -34,26 +34,8 @@ public class NotificationSettingsService(DataContext db, TimeProvider timeProvid
         CancellationToken cancellationToken
     )
     {
-        var settings = await OwnedBy(userId, integrationId)
-            .Select(x => new
-            {
-                EnabledAt = db
-                    .IntegrationEmailNotifications.Where(n => n.IntegrationId == x.Id)
-                    .Select(n => (DateTime?)n.CreatedAt)
-                    .FirstOrDefault(),
-                x.Project.Owner.Email,
-                x.Project.Owner.EmailConfirmedAt,
-            })
-            .SingleOrDefaultAsync(cancellationToken);
-
-        return settings is null
-            ? null
-            : new NotificationSettingsResponse(
-                settings.EnabledAt is not null,
-                settings.EnabledAt,
-                settings.Email,
-                settings.EmailConfirmedAt is not null
-            );
+        var state = await GetStateAsync(userId, integrationId, cancellationToken);
+        return state is null ? null : new NotificationSettingsResponse(state.EnabledAt is not null, state.EnabledAt);
     }
 
     /// <summary>
@@ -66,14 +48,15 @@ public class NotificationSettingsService(DataContext db, TimeProvider timeProvid
         CancellationToken cancellationToken
     )
     {
-        var current = await GetAsync(userId, integrationId, cancellationToken);
+        var current = await GetStateAsync(userId, integrationId, cancellationToken);
         if (current is null)
             return (NotificationSettingsSaveStatus.NotFound, null);
 
         // Наличие значения проверил валидатор запроса
         var enable = request.EmailEnabled!.Value;
+        var enabled = current.EnabledAt is not null;
 
-        if (enable && !current.EmailEnabled)
+        if (enable && !enabled)
         {
             if (!current.EmailConfirmed)
                 return (NotificationSettingsSaveStatus.EmailNotConfirmed, null);
@@ -89,7 +72,7 @@ public class NotificationSettingsService(DataContext db, TimeProvider timeProvid
                 // Письма успели включить параллельным запросом — результат тот же
             }
         }
-        else if (!enable && current.EmailEnabled)
+        else if (!enable && enabled)
         {
             var now = timeProvider.GetUtcNow().UtcDateTime;
             await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
@@ -111,6 +94,20 @@ public class NotificationSettingsService(DataContext db, TimeProvider timeProvid
 
         return (NotificationSettingsSaveStatus.Saved, await GetAsync(userId, integrationId, cancellationToken));
     }
+
+    // Когда включены письма и подтверждён ли email владельца. Null — интеграции нет или проект чужой
+    private Task<NotificationState?> GetStateAsync(Guid userId, Guid integrationId, CancellationToken cancellationToken) =>
+        OwnedBy(userId, integrationId)
+            .Select(x => new NotificationState(
+                db
+                    .IntegrationEmailNotifications.Where(n => n.IntegrationId == x.Id)
+                    .Select(n => (DateTime?)n.CreatedAt)
+                    .FirstOrDefault(),
+                x.Project.Owner.EmailConfirmedAt != null
+            ))
+            .SingleOrDefaultAsync(cancellationToken);
+
+    private record NotificationState(DateTime? EnabledAt, bool EmailConfirmed);
 
     private IQueryable<Integration> OwnedBy(Guid userId, Guid integrationId) =>
         db.Integrations.Where(x => x.Id == integrationId && x.Project.OwnerId == userId);

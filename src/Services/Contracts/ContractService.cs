@@ -2,6 +2,7 @@ using ContractWatcher.Core.Data;
 using ContractWatcher.Core.Data.Domain;
 using ContractWatcher.Core.Extensions;
 using ContractWatcher.Core.Models.Contracts;
+using ContractWatcher.Core.Models.Reports;
 using Microsoft.EntityFrameworkCore;
 
 namespace ContractWatcher.Core.Services.Contracts;
@@ -21,6 +22,8 @@ public enum ContractCreateStatus
 /// </summary>
 public class ContractService(DataContext db)
 {
+    private const string LikeEscape = @"\";
+
     /// <summary>
     /// Контракты интеграции. Null — интеграции нет или проект чужой
     /// </summary>
@@ -35,6 +38,40 @@ public class ContractService(DataContext db)
 
         return await ToResponse(db.Contracts.Where(x => x.IntegrationId == integrationId).OrderBy(x => x.CreatedAt))
             .ToListAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Страница контрактов для выбора в фильтре истории, по названию. Контракты из Core не удаляются, поэтому в списке
+    /// есть все, по которым есть история. Null — интеграции нет или проект чужой
+    /// </summary>
+    public async Task<PageResponse<ContractSearchItemResponse>?> SearchAsync(
+        Guid userId,
+        Guid integrationId,
+        ContractSearchQuery query,
+        CancellationToken cancellationToken
+    )
+    {
+        if (!await IntegrationExistsAsync(userId, integrationId, cancellationToken))
+            return null;
+
+        var contracts = db.Contracts.Where(x => x.IntegrationId == integrationId);
+
+        var search = query.Search?.Trim();
+        if (!string.IsNullOrEmpty(search))
+            contracts = contracts.Where(x => EF.Functions.ILike(x.Name, EscapeLike(search) + "%", LikeEscape));
+
+        var total = await contracts.LongCountAsync(cancellationToken);
+        var items = await contracts
+            // Без учёта регистра, как и поиск: порядок не зависит от правил сортировки базы
+            .OrderBy(x => x.Name.ToLower())
+            // Одинаковые названия упорядочены по ID, чтобы страницы не пересекались
+            .ThenBy(x => x.Id)
+            .Skip(query.Offset)
+            .Take(query.Limit)
+            .Select(x => new ContractSearchItemResponse(x.Id, x.Slug, x.Name))
+            .ToListAsync(cancellationToken);
+
+        return new PageResponse<ContractSearchItemResponse>(items, total, query.Offset, query.Limit);
     }
 
     /// <summary>
@@ -107,6 +144,11 @@ public class ContractService(DataContext db)
 
     private Task<bool> IntegrationExistsAsync(Guid userId, Guid integrationId, CancellationToken cancellationToken) =>
         db.Integrations.AnyAsync(x => x.Id == integrationId && x.Project.OwnerId == userId, cancellationToken);
+
+    // % и _ в поиске — обычные символы, а не шаблон. Символ экранирования передаётся в ILIKE явно:
+    // без него Npgsql добавляет ESCAPE '' и экранирование не работает
+    private static string EscapeLike(string value) =>
+        value.Replace(LikeEscape, LikeEscape + LikeEscape).Replace("%", LikeEscape + "%").Replace("_", LikeEscape + "_");
 
     // Номер последней версии считается в том же SQL-запросе, без загрузки самих версий
     private static IQueryable<ContractResponse> ToResponse(IQueryable<Contract> contracts) =>

@@ -100,6 +100,22 @@ public class AuthController(AuthService authService) : ApiControllerBase
     }
 
     /// <summary>
+    /// Текущий пользователь: email и подтверждён ли он. Лимит защиты от подбора паролей не действует:
+    /// фронт запрашивает это при каждом открытии и возврате на вкладку
+    /// </summary>
+    [Authorize]
+    [DisableRateLimiting]
+    [HttpGet("me")]
+    public async Task<ActionResult<AccountResponse>> GetAccount(CancellationToken cancellationToken)
+    {
+        var account = await authService.GetAccountAsync(CurrentUserId, cancellationToken);
+        if (account is null)
+            return NotFound();
+
+        return account;
+    }
+
+    /// <summary>
     /// Письмо со ссылкой подтверждения email: без подтверждения письма о неуспешных проверках не включаются.
     /// Уже подтверждён — 409, повтор раньше чем через минуту — 429
     /// </summary>

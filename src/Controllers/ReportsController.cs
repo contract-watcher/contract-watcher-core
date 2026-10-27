@@ -15,7 +15,9 @@ namespace ContractWatcher.Core.Controllers;
 public class ReportsController(ReportService reportService) : ApiControllerBase
 {
     /// <summary>
-    /// История проверок, новые первыми. Фильтры применяются до пагинации. Monitoring недоступен — 503
+    /// История проверок, новые первыми. Фильтры по контрактам, результату и периоду объединяются через «И» и
+    /// применяются до пагинации. Параметры, отклонённые Monitoring, — 400 с ошибками по параметрам.
+    /// Monitoring недоступен — 503
     /// </summary>
     [HttpGet]
     public async Task<ActionResult<PageResponse<ReportHistoryItemResponse>>> GetList(
@@ -29,12 +31,15 @@ public class ReportsController(ReportService reportService) : ApiControllerBase
         if (!validation.IsValid)
             return ValidationFailed(validation);
 
-        var (status, page) = await reportService.GetHistoryAsync(
+        var (status, page, invalidParameters) = await reportService.GetHistoryAsync(
             CurrentUserId,
             integrationId,
             query,
             cancellationToken
         );
+
+        if (status == ReportReadStatus.InvalidRequest)
+            return ValidationFailed(invalidParameters!);
 
         if (status == ReportReadStatus.MonitoringUnavailable)
             return MonitoringUnavailable();

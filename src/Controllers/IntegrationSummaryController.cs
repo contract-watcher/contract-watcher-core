@@ -1,5 +1,6 @@
 using ContractWatcher.Core.Models.Reports;
 using ContractWatcher.Core.Services.Reports;
+using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -14,15 +15,30 @@ namespace ContractWatcher.Core.Controllers;
 public class IntegrationSummaryController(ReportService reportService) : ApiControllerBase
 {
     /// <summary>
-    /// Счётчики проверок и групп, последняя проверка и последние группы нарушений. Monitoring недоступен — 503
+    /// Счётчики проверок и последняя проверка за период [from, to), без границ — за всё время. Группы нарушений —
+    /// за всё время. Параметры, отклонённые Monitoring, — 400 с ошибками по параметрам. Monitoring недоступен — 503
     /// </summary>
     [HttpGet]
     public async Task<ActionResult<IntegrationSummaryResponse>> Get(
         Guid integrationId,
+        [FromQuery] IntegrationSummaryQuery query,
+        [FromServices] IValidator<IntegrationSummaryQuery> validator,
         CancellationToken cancellationToken
     )
     {
-        var (status, summary) = await reportService.GetSummaryAsync(CurrentUserId, integrationId, cancellationToken);
+        var validation = await validator.ValidateAsync(query, cancellationToken);
+        if (!validation.IsValid)
+            return ValidationFailed(validation);
+
+        var (status, summary, invalidParameters) = await reportService.GetSummaryAsync(
+            CurrentUserId,
+            integrationId,
+            query,
+            cancellationToken
+        );
+
+        if (status == ReportReadStatus.InvalidRequest)
+            return ValidationFailed(invalidParameters!);
 
         if (status == ReportReadStatus.MonitoringUnavailable)
             return MonitoringUnavailable();
