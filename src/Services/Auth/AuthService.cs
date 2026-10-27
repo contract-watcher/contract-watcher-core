@@ -1,5 +1,6 @@
 using ContractWatcher.Core.Data;
 using ContractWatcher.Core.Data.Domain;
+using ContractWatcher.Core.Models.Auth;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -89,6 +90,15 @@ public class AuthService(
 
         return tokens;
     }
+
+    /// <summary>
+    /// Данные текущего пользователя. Null — пользователя уже нет
+    /// </summary>
+    public Task<AccountResponse?> GetAccountAsync(Guid userId, CancellationToken cancellationToken) =>
+        db
+            .Users.Where(x => x.Id == userId)
+            .Select(x => new AccountResponse(x.Email, x.EmailConfirmedAt != null))
+            .SingleOrDefaultAsync(cancellationToken);
 
     /// <summary>
     /// Меняет refresh-токен на новую пару токенов. Старый токен отзывается. Null — токен недействителен

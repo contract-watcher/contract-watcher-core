@@ -1,15 +1,8 @@
 namespace ContractWatcher.Core.Models.Notifications;
 
 /// <summary>
-/// Уведомления интеграции в ответе API
+/// Уведомления интеграции в ответе API. Email и его подтверждение — данные аккаунта, они в GET /api/auth/me
 /// </summary>
 /// <param name="EmailEnabled">Включены ли письма о неуспешных проверках</param>
 /// <param name="EmailEnabledAt">Когда письма включены: отчёты, принятые раньше, писем не вызывают. Null — выключены</param>
-/// <param name="Email">Адрес владельца проекта, на который уходят письма</param>
-/// <param name="EmailConfirmed">Подтверждён ли адрес. Без подтверждения письма не включаются</param>
-public record NotificationSettingsResponse(
-    bool EmailEnabled,
-    DateTime? EmailEnabledAt,
-    string Email,
-    bool EmailConfirmed
-);
+public record NotificationSettingsResponse(bool EmailEnabled, DateTime? EmailEnabledAt);
