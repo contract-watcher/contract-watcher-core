@@ -43,6 +43,15 @@ public static class MonitoringFixture
         {"integrationId":"22222222-2222-4222-8222-222222222222","totalReports":0,"passedReports":0,"failedReports":0,"lastReceivedAt":null}
         """;
 
+    public const string OtherIntegrationId = "11111111-1111-4111-8111-111111111111";
+
+    public const string IntegrationSummariesJson = """
+        {"items":[{"integrationId":"22222222-2222-4222-8222-222222222222","totalReports":4,"passedReports":2,"failedReports":2,
+         "lastReceivedAt":"2026-10-28T12:00:00Z"},
+         {"integrationId":"11111111-1111-4111-8111-111111111111","totalReports":0,"passedReports":0,"failedReports":0,"lastReceivedAt":null}],
+         "total":2,"offset":0,"limit":20}
+        """;
+
     public const string InvalidPeriodJson = """
         {"type":"about:blank","title":"Bad Request","status":400,"detail":"Некорректные параметры сводки.",
          "instance":"/internal/v1/integrations/22222222-2222-4222-8222-222222222222/summary","code":"INVALID_REQUEST",

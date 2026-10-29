@@ -76,6 +76,7 @@ public record MonitoringRead<T>(
 public class MonitoringClient(HttpClient httpClient)
 {
     private const string ReportsPath = "internal/v1/reports";
+    private const string IntegrationSummariesPath = "internal/v1/integration-summaries/query";
     private const string InvalidRequestCode = "INVALID_REQUEST";
 
     // Monitoring принимает время только в UTC с Z и дробью до шести знаков
@@ -179,6 +180,32 @@ public class MonitoringClient(HttpClient httpClient)
     }
 
     /// <summary>
+    /// Страница сводок набора интеграций за период, одним снимком. Monitoring сортирует их по числу неуспешных проверок,
+    /// поэтому набор передаётся целиком: при делении на части сортировка и total были бы неверными.
+    /// Интеграция без отчётов в периоде получает нули
+    /// </summary>
+    public Task<MonitoringRead<PageResponse<MonitoringIntegrationSummary>>> GetIntegrationSummariesAsync(
+        List<Guid> integrationIds,
+        ProjectSummaryQuery query,
+        CancellationToken cancellationToken
+    )
+    {
+        var request = new MonitoringIntegrationSummariesRequest(
+            integrationIds,
+            FormatTime(query.From),
+            FormatTime(query.To),
+            query.OnlyFailed,
+            query.Offset,
+            query.Limit
+        );
+
+        return ReadAsync<PageResponse<MonitoringIntegrationSummary>>(
+            () => httpClient.PostAsJsonAsync(IntegrationSummariesPath, request, cancellationToken),
+            cancellationToken
+        );
+    }
+
+    /// <summary>
     /// Отправка отчёта. Error — описание ошибки для Rejected и Unavailable
     /// </summary>
     public async Task<(MonitoringDeliveryStatus Status, string? Error)> SendReportAsync(
@@ -218,12 +245,18 @@ public class MonitoringClient(HttpClient httpClient)
         }
     }
 
-    private async Task<MonitoringRead<T>> GetAsync<T>(string path, CancellationToken cancellationToken)
+    private Task<MonitoringRead<T>> GetAsync<T>(string path, CancellationToken cancellationToken)
+        where T : class => ReadAsync<T>(() => httpClient.GetAsync(path, cancellationToken), cancellationToken);
+
+    private async Task<MonitoringRead<T>> ReadAsync<T>(
+        Func<Task<HttpResponseMessage>> send,
+        CancellationToken cancellationToken
+    )
         where T : class
     {
         try
         {
-            using var response = await httpClient.GetAsync(path, cancellationToken);
+            using var response = await send();
 
             // Неизвестный путь Monitoring отдаёт как 500, поэтому 404 — это именно «нет такого отчёта или группы»
             if (response.StatusCode == HttpStatusCode.NotFound)

@@ -589,7 +589,7 @@ public sealed class MonitoringClientTests
 
         // Assert
         Assert.Equal(MonitoringReadStatus.Found, read.Status);
-        Assert.Equal(new MonitoringIntegrationSummary(0, 0, 0, null), read.Value);
+        Assert.Equal(new MonitoringIntegrationSummary(Integration, 0, 0, 0, null), read.Value);
     }
 
     [Fact]
@@ -605,6 +605,179 @@ public sealed class MonitoringClientTests
         // Assert
         Assert.Equal(MonitoringReadStatus.InvalidRequest, read.Status);
         Assert.Equal(["from"], read.InvalidParameters!.Keys);
+    }
+
+    #endregion
+
+    #region GetIntegrationSummariesAsync
+
+    [Fact]
+    public async Task GetIntegrationSummariesAsync_WhenPeriodIsNotSet_SendsSetWithoutBounds()
+    {
+        // Arrange
+        HttpRequestMessage? capturedRequest = null;
+        string? body = null;
+
+        using var httpClient = CreateHttpClient(async request =>
+        {
+            capturedRequest = request;
+            body = await request.Content!.ReadAsStringAsync();
+            return CreateJsonResponse(HttpStatusCode.OK, IntegrationSummariesJson);
+        });
+        var client = new MonitoringClient(httpClient);
+
+        // Act
+        await client.GetIntegrationSummariesAsync(
+            [Integration, Guid.Parse(OtherIntegrationId)],
+            new ProjectSummaryQuery(),
+            CancellationToken.None
+        );
+
+        // Assert
+        Assert.NotNull(capturedRequest);
+        Assert.Equal(HttpMethod.Post, capturedRequest.Method);
+        Assert.Equal("/internal/v1/integration-summaries/query", capturedRequest.RequestUri!.AbsolutePath);
+        // Параметры Monitoring принимает только в теле, непустой query он отклоняет
+        Assert.Empty(capturedRequest.RequestUri.Query);
+        Assert.Equal("application/json", capturedRequest.Content!.Headers.ContentType!.MediaType);
+
+        // Явный null Monitoring отклоняет, поэтому границ без значения в теле нет
+        using var json = JsonDocument.Parse(body!);
+        Assert.Equal(
+            ["integrationIds", "limit", "offset", "onlyFailed"],
+            json.RootElement.EnumerateObject().Select(x => x.Name).Order()
+        );
+        Assert.Equal(
+            [IntegrationId, OtherIntegrationId],
+            json.RootElement.GetProperty("integrationIds").EnumerateArray().Select(x => x.GetString())
+        );
+        Assert.False(json.RootElement.GetProperty("onlyFailed").GetBoolean());
+        Assert.Equal(0, json.RootElement.GetProperty("offset").GetInt32());
+        Assert.Equal(20, json.RootElement.GetProperty("limit").GetInt32());
+    }
+
+    [Fact]
+    public async Task GetIntegrationSummariesAsync_WhenFiltersAreSet_SendsThemInMonitoringFormat()
+    {
+        // Arrange
+        string? body = null;
+
+        using var httpClient = CreateHttpClient(async request =>
+        {
+            body = await request.Content!.ReadAsStringAsync();
+            return CreateJsonResponse(HttpStatusCode.OK, IntegrationSummariesJson);
+        });
+        var client = new MonitoringClient(httpClient);
+
+        var summaryQuery = new ProjectSummaryQuery
+        {
+            From = new DateTimeOffset(2026, 10, 26, 0, 0, 0, TimeSpan.FromHours(3)),
+            To = new DateTimeOffset(2026, 10, 28, 0, 0, 0, TimeSpan.FromHours(3)).AddTicks(1_234_567),
+            OnlyFailed = true,
+            Offset = 40,
+            Limit = 100,
+        };
+
+        // Act
+        await client.GetIntegrationSummariesAsync([Integration], summaryQuery, CancellationToken.None);
+
+        // Assert
+        using var json = JsonDocument.Parse(body!);
+        var root = json.RootElement;
+        Assert.Equal("2026-10-25T21:00:00.000000Z", root.GetProperty("from").GetString());
+        // Monitoring принимает не больше шести знаков дроби: седьмой отбрасывается
+        Assert.Equal("2026-10-27T21:00:00.123456Z", root.GetProperty("to").GetString());
+        Assert.True(root.GetProperty("onlyFailed").GetBoolean());
+        Assert.Equal(40, root.GetProperty("offset").GetInt32());
+        Assert.Equal(100, root.GetProperty("limit").GetInt32());
+    }
+
+    [Fact]
+    public async Task GetIntegrationSummariesAsync_WhenMonitoringReturnsPage_ReturnsSummaries()
+    {
+        // Arrange
+        using var httpClient = CreateHttpClient(CreateJsonResponse(HttpStatusCode.OK, IntegrationSummariesJson));
+        var client = new MonitoringClient(httpClient);
+
+        // Act
+        var read = await client.GetIntegrationSummariesAsync(
+            [Integration, Guid.Parse(OtherIntegrationId)],
+            new ProjectSummaryQuery(),
+            CancellationToken.None
+        );
+
+        // Assert
+        Assert.Equal(MonitoringReadStatus.Found, read.Status);
+
+        var page = read.Value!;
+        Assert.Equal(2, page.Total);
+        Assert.Equal(0, page.Offset);
+        Assert.Equal(20, page.Limit);
+        Assert.Collection(
+            page.Items,
+            failed =>
+            {
+                Assert.Equal(Integration, failed.IntegrationId);
+                Assert.Equal(4, failed.TotalReports);
+                Assert.Equal(2, failed.PassedReports);
+                Assert.Equal(2, failed.FailedReports);
+                Assert.Equal(new DateTime(2026, 10, 28, 12, 0, 0, DateTimeKind.Utc), failed.LastReceivedAt);
+                Assert.Equal(DateTimeKind.Utc, failed.LastReceivedAt!.Value.Kind);
+            },
+            withoutReports =>
+                Assert.Equal(
+                    new MonitoringIntegrationSummary(Guid.Parse(OtherIntegrationId), 0, 0, 0, null),
+                    withoutReports
+                )
+        );
+    }
+
+    [Fact]
+    public async Task GetIntegrationSummariesAsync_WhenMonitoringRejectsPeriod_ReturnsInvalidParameters()
+    {
+        // Arrange
+        using var httpClient = CreateHttpClient(CreateProblemResponse(HttpStatusCode.BadRequest, InvalidPeriodJson));
+        var client = new MonitoringClient(httpClient);
+
+        // Act
+        var read = await client.GetIntegrationSummariesAsync([Integration], new ProjectSummaryQuery(), CancellationToken.None);
+
+        // Assert
+        Assert.Equal(MonitoringReadStatus.InvalidRequest, read.Status);
+        Assert.Equal(["from"], read.InvalidParameters!.Keys);
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.RequestEntityTooLarge)]
+    [InlineData(HttpStatusCode.UnsupportedMediaType)]
+    [InlineData(HttpStatusCode.ServiceUnavailable)]
+    public async Task GetIntegrationSummariesAsync_WhenMonitoringFails_ReturnsUnavailable(HttpStatusCode statusCode)
+    {
+        // Arrange
+        using var httpClient = CreateHttpClient(CreateProblemResponse(statusCode, """{"code":"STORAGE_UNAVAILABLE"}"""));
+        var client = new MonitoringClient(httpClient);
+
+        // Act
+        var read = await client.GetIntegrationSummariesAsync([Integration], new ProjectSummaryQuery(), CancellationToken.None);
+
+        // Assert
+        Assert.Equal(MonitoringReadStatus.Unavailable, read.Status);
+        Assert.Contains($"HTTP {(int)statusCode}", read.Error);
+    }
+
+    [Fact]
+    public async Task GetIntegrationSummariesAsync_WhenMonitoringIsUnreachable_ReturnsUnavailable()
+    {
+        // Arrange
+        using var httpClient = CreateFailingHttpClient(new HttpRequestException("Connection refused"));
+        var client = new MonitoringClient(httpClient);
+
+        // Act
+        var read = await client.GetIntegrationSummariesAsync([Integration], new ProjectSummaryQuery(), CancellationToken.None);
+
+        // Assert
+        Assert.Equal(MonitoringReadStatus.Unavailable, read.Status);
+        Assert.Contains("Connection refused", read.Error);
     }
 
     #endregion

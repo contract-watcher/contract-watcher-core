@@ -207,6 +207,77 @@ public class ReportService(DataContext db, MonitoringClient monitoringClient, IL
         );
     }
 
+    /// <summary>
+    /// Сводки по всем интеграциям проекта за период: больше неуспешных проверок — выше. Счётчики, фильтр, сортировку и
+    /// страницу считает Monitoring одним снимком по всему набору интеграций проекта из Core.
+    /// InvalidParameters — ошибки по параметрам запроса, если Monitoring их отклонил
+    /// </summary>
+    public async Task<(
+        ReportReadStatus Status,
+        PageResponse<ProjectSummaryItemResponse>? Page,
+        Dictionary<string, string[]>? InvalidParameters
+    )> GetProjectSummaryAsync(
+        Guid userId,
+        Guid projectId,
+        ProjectSummaryQuery query,
+        CancellationToken cancellationToken
+    )
+    {
+        var integrations = await db
+            .Integrations.Where(x => x.ProjectId == projectId && x.Project.OwnerId == userId)
+            .Select(x => new { x.Id, x.Slug, x.Name })
+            .ToDictionaryAsync(x => x.Id, cancellationToken);
+
+        if (integrations.Count == 0)
+        {
+            if (!await db.Projects.AnyAsync(x => x.Id == projectId && x.OwnerId == userId, cancellationToken))
+                return (ReportReadStatus.NotFound, null, null);
+
+            // Без интеграций сводок нет, и Monitoring не нужен
+            return (
+                ReportReadStatus.Found,
+                new PageResponse<ProjectSummaryItemResponse>([], 0, query.Offset, query.Limit),
+                null
+            );
+        }
+
+        var summaries = await monitoringClient.GetIntegrationSummariesAsync(
+            [.. integrations.Keys],
+            query,
+            cancellationToken
+        );
+        if (summaries.Status != MonitoringReadStatus.Found)
+            return (
+                Fail(summaries.Status, summaries.Error, passInvalidRequest: true),
+                null,
+                ToQueryErrors(summaries.InvalidParameters)
+            );
+
+        var page = summaries.Value!;
+        // Monitoring возвращает только переданные ему интеграции, поэтому каждая есть в словаре
+        var items = page
+            .Items.Select(x =>
+            {
+                var integration = integrations[x.IntegrationId];
+                return new ProjectSummaryItemResponse(
+                    x.IntegrationId,
+                    integration.Slug,
+                    integration.Name,
+                    x.TotalReports,
+                    x.PassedReports,
+                    x.FailedReports,
+                    x.LastReceivedAt
+                );
+            })
+            .ToList();
+
+        return (
+            ReportReadStatus.Found,
+            new PageResponse<ProjectSummaryItemResponse>(items, page.Total, page.Offset, page.Limit),
+            null
+        );
+    }
+
     // Ошибки параметров передаются фронту только из истории и сводки. В остальных запросах отказ Monitoring в
     // параметрах — сбой обмена: их формирует Core или проверяет по тем же правилам
     private ReportReadStatus Fail(MonitoringReadStatus status, string? error, bool passInvalidRequest = false)
