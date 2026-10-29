@@ -91,7 +91,7 @@ public class SdkReportService(DataContext db)
 
     // Нарушение должно быть таким, какое SDK может получить по правилу поля: тип из правила,
     // RequiredFieldMissing — только у обязательного поля, NullNotAllowed — только у поля без null
-    private static Dictionary<string, string[]> CheckViolations(
+    internal static Dictionary<string, string[]> CheckViolations(
         List<ValidationViolation> violations,
         List<ContractRule> rules
     )
