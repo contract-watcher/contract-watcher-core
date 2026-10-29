@@ -2,6 +2,8 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ContractWatcher.Core", "src\ContractWatcher.Core.csproj", "{B95A52A3-4951-47EC-A38F-6C8381071D67}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ContractWatcher.Core.Tests", "tests\ContractWatcher.Core.Tests.csproj", "{CDB3ED9B-7CF6-49C6-AD72-E35ED9A43BBA}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -12,5 +14,9 @@ Global
 		{B95A52A3-4951-47EC-A38F-6C8381071D67}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B95A52A3-4951-47EC-A38F-6C8381071D67}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B95A52A3-4951-47EC-A38F-6C8381071D67}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CDB3ED9B-7CF6-49C6-AD72-E35ED9A43BBA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CDB3ED9B-7CF6-49C6-AD72-E35ED9A43BBA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CDB3ED9B-7CF6-49C6-AD72-E35ED9A43BBA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CDB3ED9B-7CF6-49C6-AD72-E35ED9A43BBA}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

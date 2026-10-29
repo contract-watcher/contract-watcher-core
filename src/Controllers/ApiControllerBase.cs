@@ -27,4 +27,10 @@ public abstract class ApiControllerBase : ControllerBase
             title: "Monitoring is unavailable, try again later",
             statusCode: StatusCodes.Status503ServiceUnavailable
         );
+
+    /// <summary>
+    /// Monitoring отклонил запрос, который сформировал Core: это ошибка Core, повтор не поможет
+    /// </summary>
+    protected ActionResult MonitoringRejected() =>
+        Problem(title: "Monitoring rejected the request", statusCode: StatusCodes.Status500InternalServerError);
 }

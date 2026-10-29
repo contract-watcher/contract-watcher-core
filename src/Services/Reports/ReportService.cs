@@ -26,6 +26,11 @@ public enum ReportReadStatus
     /// Monitoring недоступен
     /// </summary>
     MonitoringUnavailable,
+
+    /// <summary>
+    /// Monitoring отклонил запрос, который сформировал Core: повтор не поможет, нужно исправлять Core
+    /// </summary>
+    MonitoringRejected,
 }
 
 /// <summary>
@@ -207,8 +212,85 @@ public class ReportService(DataContext db, MonitoringClient monitoringClient, IL
         );
     }
 
-    // Ошибки параметров передаются фронту только из истории и сводки. В остальных запросах отказ Monitoring в
-    // параметрах — сбой обмена: их формирует Core или проверяет по тем же правилам
+    /// <summary>
+    /// Сводки по всем или выбранным интеграциям проекта за период: больше неуспешных проверок — выше. Счётчики, фильтр,
+    /// сортировку и страницу считает Monitoring одним снимком по всему набору интеграций из Core, порядок и total
+    /// не меняются. InvalidParameters — ошибки по параметрам запроса, если Monitoring их отклонил
+    /// </summary>
+    public async Task<(
+        ReportReadStatus Status,
+        PageResponse<ProjectSummaryItemResponse>? Page,
+        Dictionary<string, string[]>? InvalidParameters
+    )> GetProjectSummaryAsync(
+        Guid userId,
+        Guid projectId,
+        ProjectSummaryQuery query,
+        CancellationToken cancellationToken
+    )
+    {
+        var projectIntegrations = db.Integrations.Where(x => x.ProjectId == projectId && x.Project.OwnerId == userId);
+
+        // Monitoring не проверяет, к какому проекту относится интеграция, поэтому выбранные берутся только из проекта
+        if (query.IntegrationId is { Count: > 0 } selected)
+            projectIntegrations = projectIntegrations.Where(x => selected.Contains(x.Id));
+
+        var integrations = await projectIntegrations
+            .Select(x => new { x.Id, x.Slug, x.Name })
+            .ToDictionaryAsync(x => x.Id, cancellationToken);
+
+        if (integrations.Count == 0)
+        {
+            if (!await db.Projects.AnyAsync(x => x.Id == projectId && x.OwnerId == userId, cancellationToken))
+                return (ReportReadStatus.NotFound, null, null);
+
+            // В проекте нет интеграций или среди выбранных нет интеграций проекта: сводок нет, и Monitoring не нужен
+            return (
+                ReportReadStatus.Found,
+                new PageResponse<ProjectSummaryItemResponse>([], 0, query.Offset, query.Limit),
+                null
+            );
+        }
+
+        var summaries = await monitoringClient.GetIntegrationSummariesAsync(
+            [.. integrations.Keys],
+            query,
+            cancellationToken
+        );
+        if (summaries.Status != MonitoringReadStatus.Found)
+            return (
+                Fail(summaries.Status, summaries.Error, passInvalidRequest: true),
+                null,
+                ToQueryErrors(summaries.InvalidParameters)
+            );
+
+        var page = summaries.Value!;
+        // Monitoring возвращает только переданные ему интеграции, поэтому каждая есть в словаре
+        var items = page
+            .Items.Select(x =>
+            {
+                var integration = integrations[x.IntegrationId];
+                return new ProjectSummaryItemResponse(
+                    x.IntegrationId,
+                    integration.Slug,
+                    integration.Name,
+                    x.TotalReports,
+                    x.PassedReports,
+                    x.FailedReports,
+                    x.LastReceivedAt
+                );
+            })
+            .ToList();
+
+        return (
+            ReportReadStatus.Found,
+            new PageResponse<ProjectSummaryItemResponse>(items, page.Total, page.Offset, page.Limit),
+            null
+        );
+    }
+
+    // Ошибки параметров передаются фронту только из истории и сводок. В остальных запросах отказ Monitoring в
+    // параметрах — ошибка Core: их формирует Core или проверяет по тем же правилам. Повтор при ней не поможет,
+    // поэтому она не выдаётся за недоступность Monitoring
     private ReportReadStatus Fail(MonitoringReadStatus status, string? error, bool passInvalidRequest = false)
     {
         if (status == MonitoringReadStatus.NotFound)
@@ -219,6 +301,12 @@ public class ReportService(DataContext db, MonitoringClient monitoringClient, IL
             // Core проверяет те же правила, поэтому отказ Monitoring значит, что правила разошлись
             logger.LogWarning("Monitoring rejected request parameters: {Error}", error);
             return ReportReadStatus.InvalidRequest;
+        }
+
+        if (status is MonitoringReadStatus.InvalidRequest or MonitoringReadStatus.Rejected)
+        {
+            logger.LogError("Monitoring rejected the request built by Core: {Error}", error);
+            return ReportReadStatus.MonitoringRejected;
         }
 
         logger.LogWarning("Reading from Monitoring failed: {Error}", error);
