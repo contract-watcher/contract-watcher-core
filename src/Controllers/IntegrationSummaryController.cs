@@ -43,6 +43,9 @@ public class IntegrationSummaryController(ReportService reportService) : ApiCont
         if (status == ReportReadStatus.MonitoringUnavailable)
             return MonitoringUnavailable();
 
+        if (status == ReportReadStatus.MonitoringRejected)
+            return MonitoringRejected();
+
         if (status == ReportReadStatus.NotFound)
             return NotFound();
 

@@ -16,9 +16,9 @@ namespace ContractWatcher.Core.Controllers;
 public class ProjectSummaryController(ReportService reportService) : ApiControllerBase
 {
     /// <summary>
-    /// Страница сводок интеграций за период [from, to), без границ — за всё время. Порядок: больше неуспешных проверок —
-    /// выше. Интеграция без проверок за период — с нулями. Параметры, отклонённые Monitoring, — 400 с ошибками по
-    /// параметрам. Monitoring недоступен — 503
+    /// Страница сводок интеграций проекта или выбранных из них за период [from, to), без границ — за всё время.
+    /// Порядок: больше неуспешных проверок — выше. Интеграция без проверок за период — с нулями. Параметры, отклонённые
+    /// Monitoring, — 400 с ошибками по параметрам. Monitoring недоступен — 503, отклонил запрос Core — 500
     /// </summary>
     [HttpGet]
     public async Task<ActionResult<PageResponse<ProjectSummaryItemResponse>>> Get(
@@ -44,6 +44,9 @@ public class ProjectSummaryController(ReportService reportService) : ApiControll
 
         if (status == ReportReadStatus.MonitoringUnavailable)
             return MonitoringUnavailable();
+
+        if (status == ReportReadStatus.MonitoringRejected)
+            return MonitoringRejected();
 
         if (status == ReportReadStatus.NotFound)
             return NotFound();

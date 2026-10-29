@@ -51,6 +51,12 @@ public enum MonitoringReadStatus
     InvalidRequest,
 
     /// <summary>
+    /// Monitoring отклонил сам запрос: 400 не по параметрам, 413 или набор, который Core не должен был собрать.
+    /// Повтор не поможет, нужно исправлять Core
+    /// </summary>
+    Rejected,
+
+    /// <summary>
     /// Monitoring недоступен или ответил ошибкой
     /// </summary>
     Unavailable,
@@ -75,8 +81,14 @@ public record MonitoringRead<T>(
 /// </summary>
 public class MonitoringClient(HttpClient httpClient)
 {
+    /// <summary>
+    /// Сколько интеграций Monitoring принимает в одном запросе сводок
+    /// </summary>
+    public const int MaxIntegrationSummaryIds = 10_000;
+
     private const string ReportsPath = "internal/v1/reports";
     private const string IntegrationSummariesPath = "internal/v1/integration-summaries/query";
+    private const string IntegrationIdsParameter = "integrationIds";
     private const string InvalidRequestCode = "INVALID_REQUEST";
 
     // Monitoring принимает время только в UTC с Z и дробью до шести знаков
@@ -184,12 +196,19 @@ public class MonitoringClient(HttpClient httpClient)
     /// поэтому набор передаётся целиком: при делении на части сортировка и total были бы неверными.
     /// Интеграция без отчётов в периоде получает нули
     /// </summary>
-    public Task<MonitoringRead<PageResponse<MonitoringIntegrationSummary>>> GetIntegrationSummariesAsync(
+    public async Task<MonitoringRead<PageResponse<MonitoringIntegrationSummary>>> GetIntegrationSummariesAsync(
         List<Guid> integrationIds,
         ProjectSummaryQuery query,
         CancellationToken cancellationToken
     )
     {
+        // Больший набор Monitoring не поддерживает, а делить его нельзя
+        if (integrationIds.Count > MaxIntegrationSummaryIds)
+            return new(
+                MonitoringReadStatus.Rejected,
+                Error: $"{integrationIds.Count} integrations exceed the Monitoring limit of {MaxIntegrationSummaryIds}"
+            );
+
         var request = new MonitoringIntegrationSummariesRequest(
             integrationIds,
             FormatTime(query.From),
@@ -199,10 +218,15 @@ public class MonitoringClient(HttpClient httpClient)
             query.Limit
         );
 
-        return ReadAsync<PageResponse<MonitoringIntegrationSummary>>(
+        var read = await ReadAsync<PageResponse<MonitoringIntegrationSummary>>(
             () => httpClient.PostAsJsonAsync(IntegrationSummariesPath, request, cancellationToken),
             cancellationToken
         );
+
+        // Набор интеграций собирает Core, поэтому отказ в нём — ошибка Core, а не параметров запроса
+        return read.InvalidParameters?.ContainsKey(IntegrationIdsParameter) == true
+            ? new(MonitoringReadStatus.Rejected, Error: read.Error)
+            : read;
     }
 
     /// <summary>
@@ -267,12 +291,19 @@ public class MonitoringClient(HttpClient httpClient)
                 var body = await response.Content.ReadAsStringAsync(cancellationToken);
                 var error = $"Monitoring returned HTTP {(int)response.StatusCode}: {body}";
 
-                var invalidParameters =
-                    response.StatusCode == HttpStatusCode.BadRequest ? ParseInvalidParameters(body) : null;
+                // 400 INVALID_REQUEST с ошибками по параметрам можно показать пользователю. Другой 400 и 413 — Monitoring
+                // отклонил запрос, который сформировал Core: повтор не поможет. Остальное — сбой Monitoring или окружения
+                if (response.StatusCode == HttpStatusCode.BadRequest)
+                {
+                    var invalidParameters = ParseInvalidParameters(body);
+                    return invalidParameters is null
+                        ? new(MonitoringReadStatus.Rejected, Error: error)
+                        : new(MonitoringReadStatus.InvalidRequest, Error: error, InvalidParameters: invalidParameters);
+                }
 
-                return invalidParameters is null
-                    ? new(MonitoringReadStatus.Unavailable, Error: error)
-                    : new(MonitoringReadStatus.InvalidRequest, Error: error, InvalidParameters: invalidParameters);
+                return response.StatusCode == HttpStatusCode.RequestEntityTooLarge
+                    ? new(MonitoringReadStatus.Rejected, Error: error)
+                    : new(MonitoringReadStatus.Unavailable, Error: error);
             }
 
             var value = await response.Content.ReadFromJsonAsync<T>(cancellationToken);

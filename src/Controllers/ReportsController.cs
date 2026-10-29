@@ -44,6 +44,9 @@ public class ReportsController(ReportService reportService) : ApiControllerBase
         if (status == ReportReadStatus.MonitoringUnavailable)
             return MonitoringUnavailable();
 
+        if (status == ReportReadStatus.MonitoringRejected)
+            return MonitoringRejected();
+
         if (status == ReportReadStatus.NotFound)
             return NotFound();
 
@@ -69,6 +72,9 @@ public class ReportsController(ReportService reportService) : ApiControllerBase
 
         if (status == ReportReadStatus.MonitoringUnavailable)
             return MonitoringUnavailable();
+
+        if (status == ReportReadStatus.MonitoringRejected)
+            return MonitoringRejected();
         
         if (status == ReportReadStatus.NotFound)
             return NotFound();

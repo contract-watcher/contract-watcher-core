@@ -40,6 +40,40 @@ public sealed class ProjectSummaryQueryValidatorTests
     }
 
     [Fact]
+    public void Validate_WhenIntegrationIdsAreAtLimit_HasNoErrors()
+    {
+        // Arrange
+        var query = new ProjectSummaryQuery
+        {
+            IntegrationId = [.. Enumerable.Range(0, ProjectSummaryQuery.MaxIntegrationIds).Select(_ => Guid.NewGuid())],
+        };
+
+        // Act
+        var result = _validator.TestValidate(query);
+
+        // Assert
+        result.ShouldNotHaveAnyValidationErrors();
+    }
+
+    [Fact]
+    public void Validate_WhenIntegrationIdsExceedLimit_HasIntegrationIdError()
+    {
+        // Arrange
+        var query = new ProjectSummaryQuery
+        {
+            IntegrationId = [.. Enumerable.Range(0, ProjectSummaryQuery.MaxIntegrationIds + 1).Select(_ => Guid.NewGuid())],
+        };
+
+        // Act
+        var result = _validator.TestValidate(query);
+
+        // Assert
+        result
+            .ShouldHaveValidationErrorFor(x => x.IntegrationId)
+            .WithErrorMessage($"At most {ProjectSummaryQuery.MaxIntegrationIds} 'integrationId' values are allowed");
+    }
+
+    [Fact]
     public void Validate_WhenOnlyOneBoundIsSet_HasNoErrors()
     {
         // Act

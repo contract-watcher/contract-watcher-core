@@ -407,7 +407,7 @@ public sealed class MonitoringClientTests
     [InlineData(InvalidRequestWithoutErrorsJson)]
     [InlineData("not json")]
     [InlineData("")]
-    public async Task GetAsync_WhenBadRequestIsNotAboutParameters_ReturnsUnavailable(string body)
+    public async Task GetAsync_WhenBadRequestIsNotAboutParameters_ReturnsRejected(string body)
     {
         // Arrange
         using var httpClient = CreateHttpClient(CreateProblemResponse(HttpStatusCode.BadRequest, body));
@@ -417,7 +417,7 @@ public sealed class MonitoringClientTests
         var read = await client.GetSummaryAsync(Integration, new IntegrationSummaryQuery(), CancellationToken.None);
 
         // Assert
-        Assert.Equal(MonitoringReadStatus.Unavailable, read.Status);
+        Assert.Equal(MonitoringReadStatus.Rejected, read.Status);
         Assert.Contains("HTTP 400", read.Error);
         Assert.Null(read.InvalidParameters);
     }
@@ -747,9 +747,90 @@ public sealed class MonitoringClientTests
         Assert.Equal(["from"], read.InvalidParameters!.Keys);
     }
 
+    [Fact]
+    public async Task GetIntegrationSummariesAsync_WhenMonitoringRejectsIntegrationIds_ReturnsRejected()
+    {
+        // Arrange
+        const string invalidIdsJson = """
+            {"type":"about:blank","title":"Bad Request","status":400,"detail":"Некорректные параметры сводок.",
+             "instance":"/internal/v1/integration-summaries/query","code":"INVALID_REQUEST",
+             "errors":{"integrationIds":["Требуется массив от 0 до 10000 UUID до удаления повторов."]}}
+            """;
+        using var httpClient = CreateHttpClient(CreateProblemResponse(HttpStatusCode.BadRequest, invalidIdsJson));
+        var client = new MonitoringClient(httpClient);
+
+        // Act
+        var read = await client.GetIntegrationSummariesAsync([Integration], new ProjectSummaryQuery(), CancellationToken.None);
+
+        // Assert
+        Assert.Equal(MonitoringReadStatus.Rejected, read.Status);
+        Assert.Null(read.InvalidParameters);
+        Assert.Contains("integrationIds", read.Error);
+    }
+
+    [Fact]
+    public async Task GetIntegrationSummariesAsync_WhenBodyIsTooLarge_ReturnsRejected()
+    {
+        // Arrange
+        using var httpClient = CreateHttpClient(
+            CreateProblemResponse(HttpStatusCode.RequestEntityTooLarge, """{"code":"REQUEST_TOO_LARGE","errors":{}}""")
+        );
+        var client = new MonitoringClient(httpClient);
+
+        // Act
+        var read = await client.GetIntegrationSummariesAsync([Integration], new ProjectSummaryQuery(), CancellationToken.None);
+
+        // Assert
+        Assert.Equal(MonitoringReadStatus.Rejected, read.Status);
+        Assert.Contains("HTTP 413", read.Error);
+    }
+
+    [Fact]
+    public async Task GetIntegrationSummariesAsync_WhenSetExceedsMonitoringLimit_ReturnsRejectedWithoutRequest()
+    {
+        // Arrange
+        var sent = false;
+        using var httpClient = CreateHttpClient(_ =>
+        {
+            sent = true;
+            return Task.FromResult(CreateJsonResponse(HttpStatusCode.OK, IntegrationSummariesJson));
+        });
+        var client = new MonitoringClient(httpClient);
+        var integrationIds = Enumerable.Range(0, MonitoringClient.MaxIntegrationSummaryIds + 1).Select(_ => Guid.NewGuid()).ToList();
+
+        // Act
+        var read = await client.GetIntegrationSummariesAsync(integrationIds, new ProjectSummaryQuery(), CancellationToken.None);
+
+        // Assert
+        Assert.Equal(MonitoringReadStatus.Rejected, read.Status);
+        Assert.False(sent);
+    }
+
+    [Fact]
+    public async Task GetIntegrationSummariesAsync_WhenSetIsAtMonitoringLimit_SendsWholeSet()
+    {
+        // Arrange
+        string? body = null;
+        using var httpClient = CreateHttpClient(async request =>
+        {
+            body = await request.Content!.ReadAsStringAsync();
+            return CreateJsonResponse(HttpStatusCode.OK, IntegrationSummariesJson);
+        });
+        var client = new MonitoringClient(httpClient);
+        var integrationIds = Enumerable.Range(0, MonitoringClient.MaxIntegrationSummaryIds).Select(_ => Guid.NewGuid()).ToList();
+
+        // Act
+        var read = await client.GetIntegrationSummariesAsync(integrationIds, new ProjectSummaryQuery(), CancellationToken.None);
+
+        // Assert
+        Assert.Equal(MonitoringReadStatus.Found, read.Status);
+        using var json = JsonDocument.Parse(body!);
+        Assert.Equal(MonitoringClient.MaxIntegrationSummaryIds, json.RootElement.GetProperty("integrationIds").GetArrayLength());
+    }
+
     [Theory]
-    [InlineData(HttpStatusCode.RequestEntityTooLarge)]
     [InlineData(HttpStatusCode.UnsupportedMediaType)]
+    [InlineData(HttpStatusCode.InternalServerError)]
     [InlineData(HttpStatusCode.ServiceUnavailable)]
     public async Task GetIntegrationSummariesAsync_WhenMonitoringFails_ReturnsUnavailable(HttpStatusCode statusCode)
     {

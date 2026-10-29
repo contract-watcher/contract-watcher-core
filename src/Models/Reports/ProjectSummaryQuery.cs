@@ -7,6 +7,15 @@ namespace ContractWatcher.Core.Models.Reports;
 /// </summary>
 public class ProjectSummaryQuery
 {
+    // Сто ID в query-строке укладываются в ограничение Kestrel на длину строки запроса
+    public const int MaxIntegrationIds = 100;
+
+    /// <summary>
+    /// Выбранные интеграции, параметр повторяется: integrationId=A&amp;integrationId=C. Интеграций не из этого проекта
+    /// в сводке нет. Null — все интеграции проекта
+    /// </summary>
+    public List<Guid>? IntegrationId { get; set; }
+
     /// <summary>
     /// Нижняя граница времени приёма отчёта, включительно
     /// </summary>
@@ -40,6 +49,10 @@ public class ProjectSummaryQueryValidator : AbstractValidator<ProjectSummaryQuer
 {
     public ProjectSummaryQueryValidator()
     {
+        RuleFor(x => x.IntegrationId)
+            .Must(x => x!.Count <= ProjectSummaryQuery.MaxIntegrationIds)
+            .When(x => x.IntegrationId is not null)
+            .WithMessage($"At most {ProjectSummaryQuery.MaxIntegrationIds} 'integrationId' values are allowed");
         RuleFor(x => x.To)
             .GreaterThan(x => x.From)
             .When(x => x.From is not null && x.To is not null)
